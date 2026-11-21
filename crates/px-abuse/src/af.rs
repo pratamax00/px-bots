@@ -1168,7 +1168,7 @@ impl JobManager {
             .spawn()
             .map_err(|e| format!("Failed to launch background job: {e}"))?;
 
-        let pid = child.pid();
+        let pid = child.id();
         let cmd_preview = format!("{} {}", af_bin.display(), args.join(" "));
         let job = JobRecord {
             id: id.clone(),
