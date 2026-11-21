@@ -288,9 +288,23 @@ impl App {
 
         let url_pills: Vec<String> = links
             .iter()
+            .filter(|l| is_valid_tg_url(&l.url))
             .take(6)
-            .map(|l| tg_url_button(&format!("🌐 {}", truncate_str(&l.name, 16)), &l.url))
+            .map(|l| tg_url_button(&format!("🌐 {}", truncate_str(&l.name, 16)), l.url.trim()))
             .collect();
+
+        let mut cat_pills: Vec<String> = LINK_CATEGORIES
+            .iter()
+            .map(|(k, _, label)| {
+                let st = if category == Some(*k) { "success" } else { "primary" };
+                tg_cb_button_styled(label, &format!("links:cat:{k}"), st)
+            })
+            .collect();
+        cat_pills.push(tg_cb_button_styled(
+            "All",
+            "links:all",
+            if category.is_none() { "success" } else { "primary" },
+        ));
 
         let mut blocks = vec![
             format!(
@@ -300,35 +314,20 @@ impl App {
             ),
             String::new(),
             table_markdown(&["Name", "Category"], &rows_data),
-            String::new(),
-            format!("_{}_", stamp_wib()),
         ];
         if !url_pills.is_empty() {
             blocks.push(String::new());
             blocks.push(tg_button_row(&url_pills));
         }
+        blocks.push(String::new());
+        blocks.push(tg_button_row(&cat_pills));
+        blocks.push(String::new());
+        blocks.push(format!("_{}_", stamp_wib()));
 
-        let mut cat_btns: Vec<Value> = LINK_CATEGORIES
-            .iter()
-            .map(|(k, _, label)| {
-                let st = if category == Some(*k) { "success" } else { "primary" };
-                button(label, &format!("links:cat:{k}"), st)
-            })
-            .collect();
-        cat_btns.push(button(
-            "All",
-            "links:all",
-            if category.is_none() { "success" } else { "primary" },
-        ));
-
-        let mut kb_rows = Vec::new();
-        for chunk in cat_btns.chunks(3) {
-            kb_rows.push(Value::Array(chunk.to_vec()));
-        }
-        kb_rows.push(json!([
+        let kb_rows = vec![json!([
             button("➕ Add Link", "link:start", "success"),
-            button("📁 Dashboard", "menu:home", "primary"),
-        ]));
+            button("🏠 Dashboard", "menu:home", "primary"),
+        ])];
 
         self.tg.present(
             msg_id,
@@ -652,6 +651,20 @@ impl App {
             }
         }
     }
+}
+
+fn is_valid_tg_url(raw: &str) -> bool {
+    let u = raw.trim();
+    let Some(rest) = u.strip_prefix("https://").or_else(|| u.strip_prefix("http://")) else {
+        return false;
+    };
+    if rest.is_empty()
+        || u.chars().any(|c| c.is_whitespace() || matches!(c, '`' | '"' | ''' | '<' | '>' | '(' | ')'))
+    {
+        return false;
+    }
+    let host = rest.split(['/', '?', '#']).next().unwrap_or("");
+    host.contains('.') && !host.starts_with('.') && !host.ends_with('.') && !host.contains("..")
 }
 
 // ── keyboards & cards ───────────────────────────────────────────────────────
