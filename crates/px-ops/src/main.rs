@@ -390,7 +390,9 @@ impl App {
             (
                 "Swap",
                 format!(
-                    "{} / {} ({swap_pct:.0}%)",
+                    "`{}` {:.0}% ({}/{})",
+                    progress_bar(swap_pct / 100.0, 8),
+                    swap_pct,
                     human_bytes(metrics.swap_used),
                     human_bytes(metrics.swap_total)
                 ),
