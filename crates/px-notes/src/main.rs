@@ -278,20 +278,15 @@ impl App {
                 .iter()
                 .take(12)
                 .map(|l| {
-                    vec![
-                        format!("**{}**", truncate_str(&md_text(&l.name), 22)),
-                        format!("`{}`", l.category),
-                    ]
+                    let name_cell = if is_valid_tg_url(&l.url) {
+                        tg_url_button(&truncate_str(&l.name, 22), l.url.trim())
+                    } else {
+                        format!("**{}**", truncate_str(&md_text(&l.name), 22))
+                    };
+                    vec![name_cell, format!("`{}`", l.category)]
                 })
                 .collect()
         };
-
-        let url_pills: Vec<String> = links
-            .iter()
-            .filter(|l| is_valid_tg_url(&l.url))
-            .take(6)
-            .map(|l| tg_url_button(&format!("🌐 {}", truncate_str(&l.name, 16)), l.url.trim()))
-            .collect();
 
         let mut cat_pills: Vec<String> = LINK_CATEGORIES
             .iter()
@@ -306,23 +301,19 @@ impl App {
             if category.is_none() { "success" } else { "primary" },
         ));
 
-        let mut blocks = vec![
+        let blocks = vec![
             format!(
                 "**🔗 PX-Notes · Bookmarks** · {} · {}",
                 hl(cat_title),
                 hl(&format!("{} links", links.len()))
             ),
             String::new(),
-            table_markdown(&["Name", "Category"], &rows_data),
+            table_markdown(&["Link", "Category"], &rows_data),
+            String::new(),
+            tg_button_row(&cat_pills),
+            String::new(),
+            format!("_{}_", stamp_wib()),
         ];
-        if !url_pills.is_empty() {
-            blocks.push(String::new());
-            blocks.push(tg_button_row(&url_pills));
-        }
-        blocks.push(String::new());
-        blocks.push(tg_button_row(&cat_pills));
-        blocks.push(String::new());
-        blocks.push(format!("_{}_", stamp_wib()));
 
         let kb_rows = vec![json!([
             button("➕ Add Link", "link:start", "success"),
