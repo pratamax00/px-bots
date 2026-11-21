@@ -1,25 +1,25 @@
-# Runbook Deploy & Rollback
+# Deploy & Rollback Runbook
 
-## Prasyarat
+## Prerequisites
 
-- Binary static dirilis otomatis oleh GitHub Actions ke GitHub Releases (`latest` untuk branch `main`, atau `vX.Y.Z` untuk rilis bertag).
-- File konfigurasi `runtime.env` (mode `600`) berada di luar direktori repo.
+- Static musl binaries are built automatically by GitHub Actions and published to GitHub Releases (`latest` for `main`, or `vX.Y.Z` for tagged releases).
+- Each bot requires an external `runtime.env` (`chmod 600`) stored outside this repository.
 
-## Deploy / Update Satu Bot
+## Deploy or Update a Bot
 
 ```bash
-# Tarik binary terbaru, verifikasi SHA256, dan uji --check
+# Download binary, verify SHA256, and run --check
 ./scripts/deploy.sh px-media latest /path/to/px-media/runtime.env
 
-# Atau dengan restart unit systemd otomatis (tambahkan flag --restart)
+# Download, verify, and restart systemd user unit
 ./scripts/deploy.sh px-media latest /path/to/px-media/runtime.env --restart
 ```
 
-## Contoh Unit `systemd --user`
+## Example `systemd --user` Unit
 
 ```ini
 [Unit]
-Description=PX-Media Telegram Bot
+Description=PX-Media Telegram Bot (Rust static binary)
 After=network-online.target
 Wants=network-online.target
 
@@ -36,18 +36,18 @@ MemoryMax=200M
 WantedBy=default.target
 ```
 
-## Rollback Cepat
+## Instant Rollback
 
-1. Setiap update oleh `deploy.sh` menyimpan salinan binary sebelumnya di `bin/<bot>.prev`.
-2. Untuk rollback ke binary sebelum update:
+1. Every deployment saves the previous binary as `bin/<bot>.prev`.
+2. Restore the previous binary immediately:
 
 ```bash
 cp bin/px-media.prev bin/px-media
 systemctl --user restart px-media.service
 ```
 
-3. Atau tarik ulang versi tag tertentu:
+3. Or pin any tagged release:
 
 ```bash
-./scripts/deploy.sh px-media v0.1.0 /path/to/px-media/runtime.env --restart
+./scripts/deploy.sh px-media v0.1.1 /path/to/px-media/runtime.env --restart
 ```

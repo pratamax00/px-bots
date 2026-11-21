@@ -3,7 +3,7 @@ name = "tg-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Shared zero-tokio Rust core engine untuk armada bot Telegram PX (Bot API 10.3+)"
+description = "Shared zero-tokio Rust core engine for the PX Telegram Bot Suite (Bot API 10.3+)"
 
 [dependencies]
 regex.workspace = true

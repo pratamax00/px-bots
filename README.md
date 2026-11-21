@@ -1,40 +1,40 @@
 # PX Bots
 
-Monorepo Rust Cargo Workspace berisi armada bot operator Telegram pribadi (mode **Telegram-only**, static binary `x86_64-unknown-linux-musl`, ultra-ringan **~2–5 MB RSS** per bot) dengan standar antarmuka **Telegram Bot API 10.3+**.
+A Rust Cargo Workspace monorepo of ultra-lightweight, owner-only Telegram operator bots (**Telegram-only**, static `x86_64-unknown-linux-musl` binaries, **~2–5 MB RSS** per bot) built for **Telegram Bot API 10.3+**.
 
-## Arsitektur
+## Architecture
 
-- **Shared Core (`crates/tg-core`):** HTTP `ureq` + `rustls` (IPv4-first, zero-tokio), long-polling offset atomik (`0600`), non-blocking `answerCallbackQuery` (1x RTT), `sendRichMessage` & in-place `editMessageText` dengan fallback HTML otomatis, serta primitif UI Bot API 10.3+ (`==highlight==`, tabel GFM `|:---|:---|`, `<details>`, `<tg-button>` URL/callback/copy_text, progress bar visual, WIB stamp).
-- **Isolasi Runtime:** Monorepo hanya menyatukan kode & pipeline build CI. Di server, setiap bot berjalan sebagai binary mandiri, proses mandiri, unit `systemd --user` mandiri, state mandiri, dan `runtime.env` mandiri di luar repo.
-- **Zero Toolchain di Server:** Seluruh compile & unit test berjalan di GitHub Actions (`.github/workflows/release.yml`) dan dirilis sebagai static binary lengkap dengan checksum `.sha256`.
+- **Shared Core (`crates/tg-core`):** Blocking HTTP via `ureq` + `rustls` (IPv4-first DNS resolver, zero-tokio), atomic offset persistence (`0600`), non-blocking `answerCallbackQuery` (1x RTT), rich-first `sendRichMessage` & in-place `editMessageText` with automatic HTML fallback, and Bot API 10.3+ UI primitives (`==highlight==`, canonical `|:---|:---|` GFM tables, `<details>`, native `<tg-button>` URL/callback/copy pills, progress bars, WIB timestamps).
+- **Isolated Runtime:** The monorepo only unifies source code, `tg-core`, and CI builds. On the host server, each bot runs as an independent binary, process, `systemd --user` service, state file, and external `runtime.env`.
+- **Zero Toolchain on Server:** All tests and static musl builds run in GitHub Actions (`.github/workflows/release.yml`) and publish verified binaries with `.sha256` checksums to GitHub Releases.
 
-## Daftar Bot (`px-*`)
+## Bot Suite (`px-*`)
 
-| Binary | Status | Fungsi | Dokumentasi |
+| Binary | Status | Purpose | Docs |
 | :--- | :--- | :--- | :--- |
-| **`px-media`** | ✅ Aktif (`v0.1.0`) | Unduh file Google Drive (`gdrive-dl`) & Pixeldrain ke library media + scan Jellyfin | [docs/bots/px-media.md](docs/bots/px-media.md) |
-| **`px-monitor`** | ✅ Aktif (`v0.1.0`) | Monitor balance/usage/budget InferHub + endpoint HTTP global modular | [docs/bots/px-monitor.md](docs/bots/px-monitor.md) |
-| **`px-notes`** | 🔜 Fase 2 | Manajemen catatan lokal, draft, dan pencarian cepat | — |
-| **`px-mail`** | 🔜 Fase 3 | TempMail Telegram + sync Cloudflare D1 | — |
-| **`px-abuse`** | 🔜 Fase 4 | Operator account-factory, playbooks, dan jobs | — |
-| **`px-ops`** | 🔜 Fase 5 | Breakglass kontrol server, service, apps toggle, dan alerts | — |
+| **`px-media`** | ✅ Active (`v0.1.1`) | Google Drive (`gdrive-dl`) & Pixeldrain media library downloader + Jellyfin scan | [docs/bots/px-media.md](docs/bots/px-media.md) |
+| **`px-monitor`** | ✅ Active (`v0.1.1`) | InferHub balance/usage/budget monitor + modular global HTTP target probes | [docs/bots/px-monitor.md](docs/bots/px-monitor.md) |
+| **`px-notes`** | 🔜 Phase 2 | Local Markdown notes manager, drafts, and fast search | — |
+| **`px-mail`** | 🔜 Phase 3 | Ephemeral TempMail operator + Cloudflare D1 sync | — |
+| **`px-abuse`** | 🔜 Phase 4 | Account-factory operator, playbooks, jobs, and audit log | — |
+| **`px-ops`** | 🔜 Phase 5 | Breakglass host operations, service control, apps toggle, and alerts | — |
 
-## Quick Start & Deploy
+## Quick Deploy
 
-1. Siapkan file `runtime.env` (mode `600`, **di luar direktori repo**) berdasarkan `.env.example` di masing-masing crate.
-2. Tarik static binary dari GitHub Releases dan verifikasi checksum:
+1. Create an external `runtime.env` (`chmod 600`, **outside this repository**) from each crate's `.env.example`.
+2. Pull the static binary from GitHub Releases and verify its checksum:
 
 ```bash
-./scripts/deploy.sh px-media latest /path/to/px-media/runtime.env
-./scripts/deploy.sh px-monitor latest /path/to/px-monitor/runtime.env
+./scripts/deploy.sh px-media latest /path/to/px-media/runtime.env --restart
+./scripts/deploy.sh px-monitor latest /path/to/px-monitor/runtime.env --restart
 ```
 
-3. Cek dokumentasi lengkap:
-   - [Arsitektur & Isolasi](docs/architecture.md)
-   - [Runbook Deploy & Rollback](docs/deploy-runbook.md)
+3. Full documentation:
+   - [Architecture & Runtime Isolation](docs/architecture.md)
+   - [Deploy & Rollback Runbook](docs/deploy-runbook.md)
    - [Changelog](CHANGELOG.md)
 
-## Keamanan & Privasi
+## Security & Privacy
 
-- 100% konfigurasi (token bot, `OWNER_ID`, API key, domain, IP, path) wajib berasal dari environment variable eksternal.
-- Jalankan `./scripts/privacy-check.sh` sebelum setiap `git push`.
+- 100% of configuration (bot tokens, `OWNER_ID`, API keys, private domains/IPs, host paths) must be provided via external environment variables.
+- Run `./scripts/privacy-check.sh` before every `git push`.

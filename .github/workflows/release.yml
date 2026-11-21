@@ -64,5 +64,5 @@ jobs:
           else
             gh release create "$TAG" dist/* \
               --title "PX Bots ($TAG)" \
-              --notes "Static x86_64-unknown-linux-musl release dari commit ${GITHUB_SHA::7}."
+              --notes "Static x86_64-unknown-linux-musl release built from commit ${GITHUB_SHA::7}."
           fi

@@ -5,7 +5,7 @@ use std::path::Path;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
-/// Muat state JSON dari disk; kembalikan default bila file belum ada atau rusak.
+/// Loads JSON state from disk, returning `Default` if missing or unreadable.
 pub fn load_json<T: DeserializeOwned + Default>(path: &Path) -> T {
     match fs::read_to_string(path) {
         Ok(raw) => serde_json::from_str(&raw).unwrap_or_default(),
@@ -13,7 +13,7 @@ pub fn load_json<T: DeserializeOwned + Default>(path: &Path) -> T {
     }
 }
 
-/// Simpan state JSON secara atomik (`.tmp` -> `rename`) dengan permission `0600`.
+/// Atomically persists JSON state (`.tmp` -> `rename`) with `0600` permissions on Unix.
 pub fn save_json_atomic<T: Serialize>(path: &Path, value: &T) {
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);

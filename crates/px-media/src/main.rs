@@ -26,7 +26,7 @@ const PIXELDRAIN_API: &str = "https://pixeldrain.com/api/file";
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(6 * 3600);
 const TARGET_KEYS: [&str; 3] = ["films", "series", "anime"];
 
-// ── konfigurasi (100% env-only) ─────────────────────────────────────────────
+// ── configuration (100% env-only) ───────────────────────────────────────────
 #[derive(Clone)]
 struct Config {
     tg_token: String,
@@ -48,17 +48,17 @@ impl Config {
     fn from_env() -> Result<Self, String> {
         let tg_token = env::var("TG_TOKEN")
             .or_else(|_| env::var("TELEGRAM_BOT_TOKEN"))
-            .map_err(|_| "Env TG_TOKEN wajib diset".to_string())?;
+            .map_err(|_| "TG_TOKEN environment variable is required".to_string())?;
         if tg_token.trim().is_empty() {
-            return Err("Env TG_TOKEN kosong".to_string());
+            return Err("TG_TOKEN is empty".to_string());
         }
         let owner_raw = env::var("OWNER_ID")
             .or_else(|_| env::var("TELEGRAM_OWNER_ID"))
-            .map_err(|_| "Env OWNER_ID wajib diset".to_string())?;
+            .map_err(|_| "OWNER_ID environment variable is required".to_string())?;
         let owner_id = owner_raw
             .trim()
             .parse::<i64>()
-            .map_err(|e| format!("OWNER_ID tidak valid: {e}"))?;
+            .map_err(|e| format!("Invalid OWNER_ID: {e}"))?;
 
         Ok(Self {
             tg_token,
@@ -95,10 +95,10 @@ impl Config {
 
 fn target_label(folder: &str) -> &'static str {
     match folder {
-        "films" => "🎬 Film",
+        "films" => "🎬 Films",
         "series" => "📺 Series",
         "anime" => "🌸 Anime",
-        _ => "📁 Lainnya",
+        _ => "📁 Other",
     }
 }
 
@@ -169,11 +169,11 @@ impl App {
                 ],
                 [
                     button(target_label("anime"), "pick:anime", style_for("anime")),
-                    button("🕒 Terbaru", "act:recent", "primary"),
+                    button("🕒 Recent", "act:recent", "primary"),
                 ],
                 [
                     button("📡 Scan Jellyfin", "act:scan", "primary"),
-                    button("🔗 Link Akses", "act:links", "primary"),
+                    button("🔗 Access Links", "act:links", "primary"),
                 ],
             ]
         })
@@ -194,43 +194,43 @@ impl App {
                 counts[idx] = c;
                 detail_rows.push(vec![
                     target_label(k).to_string(),
-                    format!("{c} item"),
+                    format!("{c} items"),
                     format!("`{p}`"),
                 ]);
             }
         }
 
         let status_val = if busy_count == 0 {
-            hl("🟢 Siap")
+            hl("🟢 Ready")
         } else {
-            hl(&format!("⬇️ Mengunduh ({busy_count})"))
+            hl(&format!("⬇️ Downloading ({busy_count})"))
         };
         let target_val = active_folder
             .as_deref()
             .map(|k| hl(target_label(k)))
-            .unwrap_or_else(|| "Belum dipilih".to_string());
+            .unwrap_or_else(|| "Not selected".to_string());
         let library_val = hl(&format!(
-            "{} Film · {} Series · {} Anime",
+            "{} Films · {} Series · {} Anime",
             counts[0], counts[1], counts[2]
         ));
         let disk_val = disk_usage_visual(&self.cfg.dir_films);
         let jf_val = if jf_up {
             hl("🟢 Online")
         } else {
-            "⏸️ Off (hemat RAM)".to_string()
+            "⏸️ Parked (RAM saver)".to_string()
         };
 
         let metrics = field_grid(&[
             ("Status", status_val),
-            ("Tujuan", target_val),
+            ("Target", target_val),
             ("Library", library_val),
             ("Storage", disk_val),
             ("Jellyfin", jf_val),
         ]);
 
         let mut pills = vec![
-            tg_cb_button("🔄 Segarkan", "act:menu"),
-            tg_cb_button("🕒 Terbaru", "act:recent"),
+            tg_cb_button("🔄 Refresh", "act:menu"),
+            tg_cb_button("🕒 Recent", "act:recent"),
         ];
         if jf_up {
             pills.push(tg_cb_button("📡 Scan", "act:scan"));
@@ -241,15 +241,15 @@ impl App {
 
         let prompt_line = match active_folder.as_deref() {
             Some(k) => format!(
-                "Kirim link **Google Drive** atau **Pixeldrain** untuk unduh ke **{}**.",
+                "Send a **Google Drive** or **Pixeldrain** link to download into **{}**.",
                 target_label(k)
             ),
-            None => "Pilih folder tujuan di tombol bawah, lalu kirim link unduhan.".to_string(),
+            None => "Pick a target folder below, then send a download link.".to_string(),
         };
 
         let detail_body = format!(
-            "{}\n\n- Tombol folder **hijau** menandakan tujuan aktif.\n- Progres unduhan diperbarui 1 baris di pesan yang sama.",
-            table_markdown(&["Folder", "Isi", "Path"], &detail_rows)
+            "{}\n\n- A **green** folder button marks the active destination.\n- Download progress updates live on a single line in-place.",
+            table_markdown(&["Folder", "Items", "Path"], &detail_rows)
         );
 
         [
@@ -264,7 +264,7 @@ impl App {
             String::new(),
             "---".to_string(),
             String::new(),
-            details_block("Folder Library & Panduan", &detail_body),
+            details_block("Library Paths & Guide", &detail_body),
         ]
         .join("\n")
     }
@@ -285,7 +285,7 @@ impl App {
         let recent = list_recent_files(Path::new(path_str), 6);
 
         let body = if recent.is_empty() {
-            "_Folder masih kosong._".to_string()
+            "_Folder is empty._".to_string()
         } else {
             let rows_data: Vec<Vec<String>> = recent
                 .iter()
@@ -300,17 +300,17 @@ impl App {
                     ]
                 })
                 .collect();
-            table_markdown(&["Item Terbaru", "Ukuran"], &rows_data)
+            table_markdown(&["Recent Item", "Size"], &rows_data)
         };
 
         let pills = tg_button_row(&[
-            tg_copy_button("📋 Salin Path", path_str),
-            tg_cb_button("🔄 Segarkan", "act:recent"),
+            tg_copy_button("📋 Copy Path", path_str),
+            tg_cb_button("🔄 Refresh", "act:recent"),
             tg_cb_button("📁 Menu", "act:menu"),
         ]);
 
         [
-            format!("**🕒 PX-Media · Terbaru** · {}", hl(target_label(&folder))),
+            format!("**🕒 PX-Media · Recent** · {}", hl(target_label(&folder))),
             String::new(),
             body,
             String::new(),
@@ -320,7 +320,7 @@ impl App {
             String::new(),
             "---".to_string(),
             String::new(),
-            details_block("Path Folder", &format!("`{path_str}`")),
+            details_block("Folder Path", &format!("`{path_str}`")),
         ]
         .join("\n")
     }
@@ -342,7 +342,7 @@ impl App {
             pills.push(tg_url_button("🌐 Jellyfin TS", &self.cfg.link_jellyfin_ts));
         }
         if !self.cfg.server_ip.is_empty() {
-            pills.push(tg_copy_button("📋 Salin IP", &self.cfg.server_ip));
+            pills.push(tg_copy_button("📋 Copy IP", &self.cfg.server_ip));
         }
 
         let mut path_rows = Vec::new();
@@ -354,21 +354,21 @@ impl App {
         let mut notes = vec![
             table_markdown(&["Folder", "Path"], &path_rows),
             String::new(),
-            "- Filebrowser bisa diakses dari luar via tunnel.".to_string(),
-            "- Jellyfin **LAN** untuk jaringan lokal; **Tailscale** untuk akses remote.".to_string(),
+            "- Filebrowser is reachable externally via tunnel.".to_string(),
+            "- Use **LAN** on your local network; **Tailscale** when away.".to_string(),
         ];
         if !self.cfg.server_ip.is_empty() {
-            notes.push(format!("- Server LAN: `{}`", self.cfg.server_ip));
+            notes.push(format!("- LAN Host: `{}`", self.cfg.server_ip));
         }
 
         let main_table = if service_rows.is_empty() {
-            "Belum ada URL layanan yang dikonfigurasi di environment.".to_string()
+            "No media service URLs configured in environment.".to_string()
         } else {
-            table_markdown(&["Layanan", "URL"], &service_rows)
+            table_markdown(&["Service", "URL"], &service_rows)
         };
 
         let mut blocks = vec![
-            format!("**🔗 PX-Media · Link Akses** · {}", hl("Layanan Media")),
+            format!("**🔗 PX-Media · Access Links** · {}", hl("Media Services")),
             String::new(),
             main_table,
             String::new(),
@@ -381,15 +381,15 @@ impl App {
         blocks.push(String::new());
         blocks.push("---".to_string());
         blocks.push(String::new());
-        blocks.push(details_block("Folder & Catatan", &notes.join("\n")));
+        blocks.push(details_block("Paths & Notes", &notes.join("\n")));
         blocks.join("\n")
     }
 
     fn jellyfin_scan(&self) -> String {
         if self.cfg.jellyfin_token.is_empty() {
             return format!(
-                "**📡 Scan Jellyfin** · {}\n\nToken Jellyfin belum diset di environment.\n\n_{}_",
-                hl("⏸️ Nonaktif"),
+                "**📡 PX-Media · Jellyfin Scan** · {}\n\n`JELLYFIN_TOKEN` is not configured.\n\n_{}_",
+                hl("⏸️ Disabled"),
                 stamp_wib()
             );
         }
@@ -399,11 +399,11 @@ impl App {
                 ("Endpoint", format!("`{}`", self.cfg.jellyfin_url)),
             ]);
             return [
-                "**📡 PX-Media · Scan Jellyfin**".to_string(),
+                "**📡 PX-Media · Jellyfin Scan**".to_string(),
                 String::new(),
                 tbl,
                 String::new(),
-                "Jellyfin sedang dimatikan (hemat RAM). Nyalakan dulu lewat **PX-Ops → Apps** saat mau nonton atau scan library.".to_string(),
+                "Jellyfin is currently parked to save RAM. Start it via **PX-Ops → Apps** when ready to watch or scan.".to_string(),
                 format!("_{}_", stamp_wib()),
             ]
             .join("\n");
@@ -418,18 +418,18 @@ impl App {
                 let ms = t0.elapsed().as_millis();
                 if status == 200 || status == 204 {
                     let tbl = field_grid(&[
-                        ("Status", hl("✅ Dipicu")),
-                        ("Respon", hl(&format!("HTTP {status} · {ms} ms"))),
+                        ("Status", hl("✅ Triggered")),
+                        ("Response", hl(&format!("HTTP {status} · {ms} ms"))),
                         ("Endpoint", format!("`{}`", self.cfg.jellyfin_url)),
                     ]);
                     format!(
-                        "**📡 PX-Media · Scan Jellyfin**\n\n{tbl}\n\nLibrary refresh berjalan di background. Metadata & poster baru muncul beberapa saat lagi.\n\n_{}_",
+                        "**📡 PX-Media · Jellyfin Scan**\n\n{tbl}\n\nLibrary refresh is running in the background. New posters and metadata will appear shortly.\n\n_{}_",
                         stamp_wib()
                     )
                 } else {
                     format!(
-                        "**📡 Scan Jellyfin** · {}\n\nJellyfin membalas HTTP `{status}` ({ms} ms).\n\n_{}_",
-                        hl("⚠️ Peringatan"),
+                        "**📡 PX-Media · Jellyfin Scan** · {}\n\nJellyfin replied with HTTP `{status}` ({ms} ms).\n\n_{}_",
+                        hl("⚠️ Warning"),
                         stamp_wib()
                     )
                 }
@@ -437,10 +437,10 @@ impl App {
             Err(e) => {
                 let msg = format!("{e}");
                 format!(
-                    "**📡 Scan Jellyfin** · {}\n\n_{}_\n\n---\n\n{}",
-                    hl("❌ Gagal"),
+                    "**📡 PX-Media · Jellyfin Scan** · {}\n\n_{}_\n\n---\n\n{}",
+                    hl("❌ Failed"),
                     stamp_wib(),
-                    details_block("Detail Error", &format!("`{}`", truncate_str(&msg, 240)))
+                    details_block("Error Details", &format!("`{}`", truncate_str(&msg, 240)))
                 )
             }
         }
@@ -455,7 +455,7 @@ impl App {
     }
 }
 
-// ── helper domain ───────────────────────────────────────────────────────────
+// ── domain helpers ──────────────────────────────────────────────────────────
 fn drive_id(s: &str) -> Option<String> {
     static RE_FULL: OnceLock<Regex> = OnceLock::new();
     static RE_URL: OnceLock<Regex> = OnceLock::new();
@@ -579,10 +579,10 @@ fn list_recent_files(dir: &Path, limit: usize) -> Vec<(String, u64, i64)> {
 fn looks_complete(path: &Path) -> (bool, String) {
     let size = match fs::metadata(path) {
         Ok(m) => m.len(),
-        Err(_) => return (false, "file tidak ada".to_string()),
+        Err(_) => return (false, "file not found".to_string()),
     };
     if size == 0 {
-        return (false, "file 0 byte".to_string());
+        return (false, "file is 0 bytes".to_string());
     }
     let mut buf = [0u8; 512];
     let n = match File::open(path).and_then(|mut f| f.read(&mut buf)) {
@@ -596,9 +596,9 @@ fn looks_complete(path: &Path) -> (bool, String) {
         || trimmed.starts_with("<html")
         || prefix200.contains("<head")
     {
-        return (false, "isinya halaman HTML".to_string());
+        return (false, "file contains an HTML page".to_string());
     }
-    (true, format!("{size} byte"))
+    (true, format!("{size} bytes"))
 }
 
 fn is_archive(name: &str) -> bool {
@@ -610,8 +610,8 @@ fn is_archive(name: &str) -> bool {
 fn kb_confirm(folder: &str) -> Value {
     json!({
         "inline_keyboard": [[
-            button(&format!("✅ Unduh ke {}", target_label(folder)), "go:yes", "success"),
-            button("❌ Batal", "go:no", "danger"),
+            button(&format!("✅ Download to {}", target_label(folder)), "go:yes", "success"),
+            button("❌ Cancel", "go:no", "danger"),
         ]]
     })
 }
@@ -621,11 +621,11 @@ fn kb_after() -> Value {
         "inline_keyboard": [
             [
                 button("📡 Scan Jellyfin", "act:scan", "success"),
-                button("🕒 Terbaru", "act:recent", "primary"),
+                button("🕒 Recent", "act:recent", "primary"),
             ],
             [
-                button("🔗 Link Akses", "act:links", "primary"),
-                button("📁 Menu Utama", "act:menu", "primary"),
+                button("🔗 Access Links", "act:links", "primary"),
+                button("📁 Dashboard", "act:menu", "primary"),
             ],
         ]
     })
@@ -634,8 +634,8 @@ fn kb_after() -> Value {
 fn kb_recent() -> Value {
     json!({
         "inline_keyboard": [[
-            button("📁 Menu Utama", "act:menu", "primary"),
-            button("🔄 Segarkan", "act:recent", ""),
+            button("📁 Dashboard", "act:menu", "primary"),
+            button("🔄 Refresh", "act:recent", ""),
         ]]
     })
 }
@@ -643,19 +643,19 @@ fn kb_recent() -> Value {
 fn kb_links() -> Value {
     json!({
         "inline_keyboard": [[
-            button("📁 Menu Utama", "act:menu", "primary"),
-            button("🔄 Segarkan", "act:links", ""),
+            button("📁 Dashboard", "act:menu", "primary"),
+            button("🔄 Refresh", "act:links", ""),
         ]]
     })
 }
 
 fn kb_back_menu() -> Value {
     json!({
-        "inline_keyboard": [[button("📁 Menu Utama", "act:menu", "primary")]]
+        "inline_keyboard": [[button("📁 Dashboard", "act:menu", "primary")]]
     })
 }
 
-// ── kartu unduhan rich ──────────────────────────────────────────────────────
+// ── rich download cards ─────────────────────────────────────────────────────
 fn build_progress_card(
     source: &str,
     folder: &str,
@@ -666,17 +666,17 @@ fn build_progress_card(
     elapsed_secs: u64,
 ) -> String {
     let line = if bytes == 0 {
-        format!("📥 {} · `{}`", hl("Menghubungkan…"), format_duration(elapsed_secs))
+        format!("📥 {} · `{}`", hl("Connecting…"), format_duration(elapsed_secs))
     } else {
         format_progress_line(bytes, total, elapsed_secs)
     };
     let tbl = field_grid(&[
         ("File", format!("`{}`", truncate_str(file_name, 40))),
         ("Folder", target_label(folder).to_string()),
-        ("Sumber", source.to_string()),
+        ("Source", source.to_string()),
     ]);
     [
-        format!("**⬇️ PX-Media · Mengunduh** · {}", hl("Berjalan")),
+        format!("**⬇️ PX-Media · Downloading** · {}", hl("Running")),
         String::new(),
         line,
         String::new(),
@@ -686,7 +686,7 @@ fn build_progress_card(
         String::new(),
         "---".to_string(),
         String::new(),
-        details_block("Tujuan", &format!("Path: `{}`", dest.display())),
+        details_block("Destination", &format!("Path: `{}`", dest.display())),
     ]
     .join("\n")
 }
@@ -706,11 +706,11 @@ fn build_done_card(
         size as f64 / 1024.0 / 1024.0
     };
     let tbl = field_grid(&[
-        ("Status", hl("✅ Selesai")),
+        ("Status", hl("✅ Complete")),
         ("File", format!("`{}`", truncate_str(fname, 42))),
-        ("Ukuran", hl(&human_bytes(size))),
+        ("Size", hl(&human_bytes(size))),
         (
-            "Kecepatan",
+            "Speed",
             format!(
                 "{} · {}",
                 hl(&format!("{avg_mb_s:.1} MB/s")),
@@ -718,24 +718,24 @@ fn build_done_card(
             ),
         ),
         ("Folder", target_label(folder).to_string()),
-        ("Sumber", source.to_string()),
+        ("Source", source.to_string()),
     ]);
     let path_str = full_path.to_string_lossy();
     let pills = tg_button_row(&[
         tg_cb_button("📡 Scan", "act:scan"),
-        tg_copy_button("📋 Salin Path", &path_str),
+        tg_copy_button("📋 Copy Path", &path_str),
         tg_cb_button("📁 Menu", "act:menu"),
     ]);
     let mut notes = vec![format!("Path: `{path_str}`")];
     notes.extend(extra_notes.iter().cloned());
 
     [
-        "**✅ PX-Media · Laporan Unduhan Selesai**".to_string(),
+        "**✅ PX-Media · Download Complete**".to_string(),
         String::new(),
         tbl,
         String::new(),
-        "- [x] File terverifikasi utuh & bukan halaman HTML".to_string(),
-        "- [x] Permission diset (`664` / `775`) siap dibaca Jellyfin".to_string(),
+        "- [x] Verified non-empty & non-HTML payload".to_string(),
+        "- [x] Permissions applied (`664` / `775`) for Jellyfin".to_string(),
         String::new(),
         format!("_{}_", stamp_wib()),
         String::new(),
@@ -743,7 +743,7 @@ fn build_done_card(
         String::new(),
         "---".to_string(),
         String::new(),
-        details_block("Detail Path & Catatan", &notes.join("\n")),
+        details_block("Path & Notes", &notes.join("\n")),
     ]
     .join("\n")
 }
@@ -757,13 +757,13 @@ fn build_error_card(
     elapsed_secs: u64,
 ) -> String {
     let tbl = field_grid(&[
-        ("Status", hl("❌ Gagal")),
-        ("Alasan", reason.to_string()),
+        ("Status", hl("❌ Failed")),
+        ("Reason", reason.to_string()),
         ("Folder", target_label(folder).to_string()),
-        ("Sumber", format!("{source} · {}", format_duration(elapsed_secs))),
+        ("Source", format!("{source} · {}", format_duration(elapsed_secs))),
     ]);
     [
-        "**❌ PX-Media · Laporan Unduhan Gagal**".to_string(),
+        "**❌ PX-Media · Download Failed**".to_string(),
         String::new(),
         tbl,
         String::new(),
@@ -772,12 +772,12 @@ fn build_error_card(
         String::new(),
         "---".to_string(),
         String::new(),
-        details_block("Log Error", &format!("```\n{err_log}\n```")),
+        details_block("Error Log", &format!("```\n{err_log}\n```")),
     ]
     .join("\n")
 }
 
-// ── subprocess runner (6h timeout, anti-deadlock pipe) ──────────────────────
+// ── subprocess runner (6h timeout, pipe-deadlock safe) ──────────────────────
 enum CmdOutcome {
     Finished { code: i32, stdout: String, stderr: String },
     TimedOut,
@@ -872,7 +872,7 @@ fn sleep_interruptible(stop: &AtomicBool, total: Duration) -> bool {
     stop.load(Ordering::Relaxed)
 }
 
-// ── workers unduhan ─────────────────────────────────────────────────────────
+// ── download workers ────────────────────────────────────────────────────────
 fn run_download(app: Arc<App>, folder: String, url: String, status_msg_id: Option<i64>) {
     let Some(dest_str) = app.cfg.target_path(&folder) else {
         return;
@@ -882,7 +882,7 @@ fn run_download(app: Arc<App>, folder: String, url: String, status_msg_id: Optio
 
     let started = Instant::now();
     let start_card =
-        build_progress_card("Google Drive", &folder, "Menyiapkan file…", &dest, 0, None, 0);
+        build_progress_card("Google Drive", &folder, "Preparing file…", &dest, 0, None, 0);
     let live_msg_id = app.tg.present(status_msg_id, &start_card, None);
 
     let stop = Arc::new(AtomicBool::new(false));
@@ -944,7 +944,7 @@ fn run_download(app: Arc<App>, folder: String, url: String, status_msg_id: Optio
 
             let (ok_file, reason) = match &fname {
                 Some(n) => looks_complete(&dest.join(n)),
-                None => (false, "tidak ada file baru".to_string()),
+                None => (false, "no new or modified file detected".to_string()),
             };
             if ok_file {
                 let fname = fname.unwrap();
@@ -955,11 +955,11 @@ fn run_download(app: Arc<App>, folder: String, url: String, status_msg_id: Optio
 
                 let mut notes = Vec::new();
                 if is_archive(&fname) {
-                    notes.push("📦 File berupa arsip (`.rar`/`.zip`/`.7z`).".to_string());
+                    notes.push("📦 Archive detected (`.rar`/`.zip`/`.7z`).".to_string());
                 }
                 if code != 0 {
                     notes.push(format!(
-                        "⚠️ Exit code `{code}`, tapi file terverifikasi lengkap ({reason})."
+                        "⚠️ Exit code `{code}`, but payload verified intact ({reason})."
                     ));
                 }
                 let card = build_done_card("Google Drive", &folder, &fname, &f, size, elapsed, &notes);
@@ -971,14 +971,14 @@ fn run_download(app: Arc<App>, folder: String, url: String, status_msg_id: Optio
                     stdout.trim()
                 };
                 let err = if raw_err.is_empty() {
-                    "tanpa pesan".to_string()
+                    "no stderr output".to_string()
                 } else {
                     tail_str(raw_err, 600)
                 };
                 let hint = if code == 0 && fname.is_none() {
-                    "Tidak ada file baru atau berubah — kemungkinan file sudah lengkap sebelumnya."
+                    "No file changes detected — the file may already be complete in the target folder."
                 } else {
-                    "Kemungkinan: link tidak publik, kuota Drive habis, atau file dihapus."
+                    "Possible causes: private link, Google Drive quota exceeded, or deleted file."
                 };
                 let card = build_error_card("Google Drive", &folder, &reason, hint, &err, elapsed);
                 app.tg.present(live_msg_id, &card, Some(kb_back_menu()));
@@ -988,20 +988,20 @@ fn run_download(app: Arc<App>, folder: String, url: String, status_msg_id: Optio
             let card = build_error_card(
                 "Google Drive",
                 &folder,
-                "Timeout 6 jam",
-                "Unduhan dihentikan otomatis karena melebihi batas 6 jam.",
+                "6-hour timeout",
+                "Download was terminated after exceeding the 6-hour limit.",
                 "timeout",
                 elapsed,
             );
             app.tg.present(live_msg_id, &card, Some(kb_back_menu()));
         }
         CmdOutcome::SpawnError(e) => {
-            log_error(&format!("download gagal: {e}"));
+            log_error(&format!("download failed: {e}"));
             let card = build_error_card(
                 "Google Drive",
                 &folder,
-                "Gagal menjalankan gdrive-dl",
-                "Periksa path executable `GDRIVE_DL` di environment.",
+                "Failed to spawn gdrive-dl",
+                "Check the `GDRIVE_DL` executable path in your environment.",
                 &truncate_str(&e, 240),
                 elapsed,
             );
@@ -1090,14 +1090,14 @@ fn run_pixeldrain(app: Arc<App>, folder: String, fid: String, status_msg_id: Opt
                 let final_size = fs::metadata(&target).map(|m| m.len()).unwrap_or(0);
                 let mut notes = Vec::new();
                 if is_archive(&name) {
-                    notes.push("📦 File berupa arsip (`.rar`/`.zip`/`.7z`).".to_string());
+                    notes.push("📦 Archive detected (`.rar`/`.zip`/`.7z`).".to_string());
                 }
                 let card =
                     build_done_card("Pixeldrain", &folder, &name, &target, final_size, elapsed, &notes);
                 app.tg.present(live_msg_id, &card, Some(kb_after()));
             } else {
                 let err = if stderr.trim().is_empty() {
-                    "tanpa pesan".to_string()
+                    "no stderr output".to_string()
                 } else {
                     tail_str(stderr.trim(), 600)
                 };
@@ -1105,7 +1105,7 @@ fn run_pixeldrain(app: Arc<App>, folder: String, fid: String, status_msg_id: Opt
                     "Pixeldrain",
                     &folder,
                     &format!("curl exit {code}"),
-                    "Kemungkinan: file dihapus, link kadaluarsa, atau terkena rate-limit.",
+                    "Possible causes: deleted file, expired link, or rate-limit.",
                     &err,
                     elapsed,
                 );
@@ -1116,20 +1116,20 @@ fn run_pixeldrain(app: Arc<App>, folder: String, fid: String, status_msg_id: Opt
             let card = build_error_card(
                 "Pixeldrain",
                 &folder,
-                "Timeout 6 jam",
-                "Unduhan dihentikan otomatis karena melebihi batas 6 jam.",
+                "6-hour timeout",
+                "Download was terminated after exceeding the 6-hour limit.",
                 "timeout",
                 elapsed,
             );
             app.tg.present(live_msg_id, &card, Some(kb_back_menu()));
         }
         CmdOutcome::SpawnError(e) => {
-            log_error(&format!("pixeldrain download gagal: {e}"));
+            log_error(&format!("pixeldrain download failed: {e}"));
             let card = build_error_card(
                 "Pixeldrain",
                 &folder,
-                "Gagal menjalankan curl",
-                "Periksa binary `curl` di server.",
+                "Failed to spawn curl",
+                "Verify `curl` is installed on the host.",
                 &truncate_str(&e, 240),
                 elapsed,
             );
@@ -1148,13 +1148,13 @@ fn handle_callback(app: &Arc<App>, cb: &Value) {
     let msg_id = cb.pointer("/message/message_id").and_then(Value::as_i64);
 
     if !app.tg.is_owner(chat_id) {
-        app.tg.ack(cb_id, "Akses khusus owner.");
+        app.tg.ack(cb_id, "Owner access only.");
         return;
     }
 
     if let Some(folder) = data.strip_prefix("pick:") {
         if app.cfg.target_path(folder).is_none() {
-            app.tg.ack(cb_id, "Folder tidak dikenal");
+            app.tg.ack(cb_id, "Unknown folder");
             return;
         }
         {
@@ -1163,7 +1163,7 @@ fn handle_callback(app: &Arc<App>, cb: &Value) {
             st.pending = None;
             app.persist_state(&st);
         }
-        app.tg.ack(cb_id, &format!("Tujuan: {}", target_label(folder)));
+        app.tg.ack(cb_id, &format!("Target: {}", target_label(folder)));
         app.tg.present(msg_id, &app.menu_text(), Some(app.kb_menu()));
     } else if data.starts_with("go:") {
         if data == "go:no" {
@@ -1172,7 +1172,7 @@ fn handle_callback(app: &Arc<App>, cb: &Value) {
                 st.pending = None;
                 app.persist_state(&st);
             }
-            app.tg.ack(cb_id, "Dibatalkan");
+            app.tg.ack(cb_id, "Cancelled");
             app.tg.present(msg_id, &app.menu_text(), Some(app.kb_menu()));
             return;
         }
@@ -1183,7 +1183,7 @@ fn handle_callback(app: &Arc<App>, cb: &Value) {
             p
         };
         let Some(p) = pending else {
-            app.tg.ack(cb_id, "Tidak ada yang menunggu");
+            app.tg.ack(cb_id, "Nothing pending");
             app.tg.present(msg_id, &app.menu_text(), Some(app.kb_menu()));
             return;
         };
@@ -1191,22 +1191,22 @@ fn handle_callback(app: &Arc<App>, cb: &Value) {
             || (p.kind == "gdrive" && p.url.as_deref().unwrap_or("").is_empty())
             || (p.kind == "pixeldrain" && p.fid.as_deref().unwrap_or("").is_empty());
         if not_ready {
-            app.tg.ack(cb_id, "Tidak ada yang menunggu");
+            app.tg.ack(cb_id, "Nothing pending");
             app.tg.present(msg_id, &app.menu_text(), Some(app.kb_menu()));
             return;
         }
         if app.busy.lock().unwrap().contains(&p.folder) {
-            app.tg.ack(cb_id, "Folder masih dipakai");
+            app.tg.ack(cb_id, "Folder busy");
             let card = format!(
-                "**⚠️ PX-Media · Folder Sibuk** · {}\n\n{} masih dipakai mengunduh. Tunggu sampai selesai.\n\n_{}_",
-                hl("Antre"),
+                "**⚠️ PX-Media · Folder Busy** · {}\n\n{} already has an active download. Wait for it to finish.\n\n_{}_",
+                hl("Queued"),
                 target_label(&p.folder),
                 stamp_wib()
             );
             app.tg.present(msg_id, &card, Some(kb_back_menu()));
             return;
         }
-        app.tg.ack(cb_id, "Mulai…");
+        app.tg.ack(cb_id, "Starting…");
         let app_clone = Arc::clone(app);
         if p.kind == "pixeldrain" {
             let fid = p.fid.unwrap_or_default();
@@ -1216,16 +1216,16 @@ fn handle_callback(app: &Arc<App>, cb: &Value) {
             thread::spawn(move || run_download(app_clone, p.folder, url, msg_id));
         }
     } else if data == "act:recent" {
-        app.tg.ack(cb_id, "File terbaru");
+        app.tg.ack(cb_id, "Recent files");
         app.tg.present(msg_id, &app.recent_text(), Some(kb_recent()));
     } else if data == "act:links" {
-        app.tg.ack(cb_id, "Link akses");
+        app.tg.ack(cb_id, "Access links");
         app.tg.present(msg_id, &app.links_text(), Some(kb_links()));
     } else if data == "act:scan" {
-        app.tg.ack(cb_id, "Cek Jellyfin…");
+        app.tg.ack(cb_id, "Checking Jellyfin…");
         app.tg.present(msg_id, &app.jellyfin_scan(), Some(kb_after()));
     } else {
-        app.tg.ack(cb_id, "Disegarkan");
+        app.tg.ack(cb_id, "Refreshed");
         app.tg.present(msg_id, &app.menu_text(), Some(app.kb_menu()));
     }
 }
@@ -1264,10 +1264,10 @@ fn handle_message(app: &Arc<App>, msg: &Value) {
     let pd = pixeldrain_id(text);
     if fid.is_none() && pd.is_none() {
         let card = format!(
-            "**⚠️ PX-Media · Link Tidak Dikenali** · {}\n\n{}\n\n_{}_",
-            hl("Cek Format"),
+            "**⚠️ PX-Media · Unsupported Link** · {}\n\n{}\n\n_{}_",
+            hl("Check Format"),
             table_markdown(
-                &["Sumber", "Contoh Format"],
+                &["Provider", "Supported Pattern"],
                 &[
                     vec!["Google Drive".into(), "`https://drive.google.com/file/d/<id>/view`".into()],
                     vec!["Pixeldrain".into(), "`https://pixeldrain.com/u/<id>`".into()],
@@ -1289,7 +1289,7 @@ fn handle_message(app: &Arc<App>, msg: &Value) {
         if kind != "u" {
             app.tg.send(
                 &format!(
-                    "**ℹ️ PX-Media · Link List Belum Didukung** · {}\n\nSaat ini baru file tunggal (`/u/<id>`) yang didukung.",
+                    "**ℹ️ PX-Media · Lists Not Supported Yet** · {}\n\nOnly single Pixeldrain files (`/u/<id>`) are supported right now.",
                     hl("Info")
                 ),
                 Some(app.kb_menu()),
@@ -1320,12 +1320,12 @@ fn handle_message(app: &Arc<App>, msg: &Value) {
             app.persist_state(&st);
         }
         let card = format!(
-            "**⬇️ PX-Media · Konfirmasi** · {}\n\n{}\n\nLanjut unduh ke folder ini?\n_{}_",
+            "**⬇️ PX-Media · Confirm Download** · {}\n\n{}\n\nStart downloading into this folder?\n_{}_",
             hl("Pixeldrain"),
             field_grid(&[
-                ("Tujuan", hl(target_label(&folder))),
+                ("Target", hl(target_label(&folder))),
                 ("File", format!("`{}`", truncate_str(preview_name, 40))),
-                ("Ukuran", hl(&preview_size)),
+                ("Size", hl(&preview_size)),
                 ("File ID", format!("`{pid}`")),
             ]),
             stamp_wib()
@@ -1346,11 +1346,11 @@ fn handle_message(app: &Arc<App>, msg: &Value) {
         app.persist_state(&st);
     }
     let card = format!(
-        "**⬇️ PX-Media · Konfirmasi** · {}\n\n{}\n\nLanjut unduh ke folder ini?\n_{}_",
+        "**⬇️ PX-Media · Confirm Download** · {}\n\n{}\n\nStart downloading into this folder?\n_{}_",
         hl("Google Drive"),
         field_grid(&[
-            ("Tujuan", hl(target_label(&folder))),
-            ("Sumber", "Google Drive (`gdrive-dl`)".to_string()),
+            ("Target", hl(target_label(&folder))),
+            ("Source", "Google Drive (`gdrive-dl`)".to_string()),
             ("File ID", format!("`{}`", truncate_str(&fid, 16))),
         ]),
         stamp_wib()
@@ -1392,13 +1392,13 @@ fn main() {
     };
 
     let app = App::new(cfg);
-    log_info(&format!("PX-Media v{VERSION} (Rust) mulai"));
+    log_info(&format!("PX-Media v{VERSION} (Rust) started"));
     app.tg.set_my_commands(&[
-        ("menu", "Dashboard & pilih folder"),
-        ("recent", "File terbaru di folder aktif"),
-        ("links", "Link akses layanan media"),
-        ("scan", "Scan library Jellyfin"),
-        ("help", "Bantuan"),
+        ("menu", "Dashboard & target folder"),
+        ("recent", "Recent files in active folder"),
+        ("links", "Media service access links"),
+        ("scan", "Trigger Jellyfin library scan"),
+        ("help", "Help & dashboard"),
     ]);
     app.tg.send(&app.menu_text(), Some(app.kb_menu()));
 

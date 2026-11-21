@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use std::thread;
 
-/// Client Telegram Bot API 10.3+ kanonik (rich-first, in-place edit, non-blocking ack).
+/// Canonical Telegram Bot API 10.3+ client (rich-first, in-place edit, non-blocking ack).
 pub struct TgClient {
     token: String,
     owner_id: i64,
@@ -33,7 +33,7 @@ impl TgClient {
         &self.agent
     }
 
-    /// Panggil mentah metode Bot API.
+    /// Raw Bot API POST request.
     pub fn call(&self, method: &str, payload: Value) -> Result<Value, String> {
         let url = format!("https://api.telegram.org/bot{}/{method}", self.token);
         let resp = match self
@@ -54,7 +54,7 @@ impl TgClient {
             return Ok(json!({}));
         }
         let parsed: Value =
-            serde_json::from_str(&text).map_err(|e| format!("JSON decode gagal: {e}"))?;
+            serde_json::from_str(&text).map_err(|e| format!("JSON decode failed: {e}"))?;
         if parsed.get("ok").and_then(Value::as_bool) == Some(false) {
             let desc = parsed
                 .get("description")
@@ -65,12 +65,12 @@ impl TgClient {
         Ok(parsed)
     }
 
-    /// Kirim pesan baru (rich-first, fallback HTML) ke chat owner.
+    /// Sends a new rich message (with automatic HTML fallback) to the owner chat.
     pub fn send(&self, markdown: &str, keyboard: Option<Value>) -> Option<i64> {
         self.send_to(self.owner_id, None, markdown, keyboard)
     }
 
-    /// Kirim pesan baru ke chat/topic tertentu (rich-first, fallback HTML).
+    /// Sends a new rich message to any chat/topic (with automatic HTML fallback).
     pub fn send_to(
         &self,
         chat_id: i64,
@@ -92,7 +92,7 @@ impl TgClient {
         match self.call("sendRichMessage", payload) {
             Ok(res) => res.pointer("/result/message_id").and_then(Value::as_i64),
             Err(e) => {
-                log_warn(&format!("sendRichMessage gagal ({e}), fallback HTML"));
+                log_warn(&format!("sendRichMessage failed ({e}), falling back to HTML"));
                 let html = markdown_to_html(markdown);
                 let mut fb = json!({
                     "chat_id": chat_id,
@@ -109,7 +109,7 @@ impl TgClient {
                 match self.call("sendMessage", fb) {
                     Ok(res) => res.pointer("/result/message_id").and_then(Value::as_i64),
                     Err(e2) => {
-                        log_error(&format!("sendMessage juga gagal: {e2}"));
+                        log_error(&format!("sendMessage fallback failed: {e2}"));
                         None
                     }
                 }
@@ -117,7 +117,7 @@ impl TgClient {
         }
     }
 
-    /// Edit pesan lama secara in-place (Bot API 10.3 `editMessageText` + `rich_message`).
+    /// Edits an existing message in-place (`editMessageText` + `rich_message`, HTML fallback).
     pub fn edit(&self, message_id: i64, markdown: &str, keyboard: Option<Value>) -> Option<i64> {
         let mut payload = json!({
             "chat_id": self.owner_id,
@@ -134,7 +134,7 @@ impl TgClient {
                 if e.to_ascii_lowercase().contains("message is not modified") {
                     return Some(message_id);
                 }
-                log_warn(&format!("editRich gagal ({e}), fallback edit HTML"));
+                log_warn(&format!("editRich failed ({e}), falling back to HTML edit"));
                 let html = markdown_to_html(markdown);
                 let mut fb = json!({
                     "chat_id": self.owner_id,
@@ -152,7 +152,7 @@ impl TgClient {
                         if e2.to_ascii_lowercase().contains("message is not modified") {
                             return Some(message_id);
                         }
-                        log_warn(&format!("editMessageText HTML gagal ({e2}), kirim baru"));
+                        log_warn(&format!("HTML edit failed ({e2}), sending new message"));
                         self.send(markdown, keyboard)
                     }
                 }
@@ -160,7 +160,7 @@ impl TgClient {
         }
     }
 
-    /// Presentasi terpadu: edit in-place bila ada `message_id`, selain itu kirim baru.
+    /// Unified presentation helper: edits in-place when `message_id` is present, else sends new.
     pub fn present(
         &self,
         message_id: Option<i64>,
@@ -173,7 +173,7 @@ impl TgClient {
         }
     }
 
-    /// Non-blocking callback ack agar respons tombol hanya menempuh 1x RTT.
+    /// Non-blocking callback acknowledgement to keep UI response at 1x RTT.
     pub fn ack(self: &Arc<Self>, cb_id: String, text: &str) {
         let client = Arc::clone(self);
         let msg = text.to_string();
@@ -186,18 +186,18 @@ impl TgClient {
         });
     }
 
-    /// Daftarkan daftar slash command bot di menu Telegram.
+    /// Publishes the bot slash command menu.
     pub fn set_my_commands(&self, commands: &[(&str, &str)]) {
         let list: Vec<Value> = commands
             .iter()
             .map(|(c, d)| json!({"command": c, "description": d}))
             .collect();
         if let Err(e) = self.call("setMyCommands", json!({"commands": list})) {
-            log_warn(&format!("setMyCommands gagal: {e}"));
+            log_warn(&format!("setMyCommands failed: {e}"));
         }
     }
 
-    /// Long-polling `getUpdates` (timeout default 25s menjaga keep-alive di bawah batas NAT).
+    /// Long-polling `getUpdates` (default 25s timeout stays below NAT idle drop).
     pub fn get_updates(&self, offset: i64, timeout_secs: u64) -> Result<Vec<Value>, String> {
         let data = self.call(
             "getUpdates",

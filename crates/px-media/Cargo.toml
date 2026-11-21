@@ -3,7 +3,7 @@ name = "px-media"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "PX-Media — bot Telegram ringan untuk mengunduh file Google Drive & Pixeldrain ke library media"
+description = "PX-Media — lightweight Telegram bot for downloading Google Drive & Pixeldrain files into your media library"
 
 [dependencies]
 regex.workspace = true

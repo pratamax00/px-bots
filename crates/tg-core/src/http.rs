@@ -1,7 +1,7 @@
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Duration;
 
-/// Resolver DNS yang selalu mengutamakan IPv4 untuk menghindari IPv6 blackhole.
+/// DNS resolver that prioritizes IPv4 addresses to avoid IPv6 blackholes.
 pub struct Ipv4FirstResolver;
 
 impl ureq::Resolver for Ipv4FirstResolver {
@@ -12,7 +12,7 @@ impl ureq::Resolver for Ipv4FirstResolver {
     }
 }
 
-/// Membuat `ureq::Agent` dengan IPv4-first resolver + timeout terukur.
+/// Builds a blocking `ureq::Agent` with IPv4-first resolution and explicit timeouts.
 pub fn build_agent(connect_secs: u64, read_secs: u64) -> ureq::Agent {
     ureq::AgentBuilder::new()
         .resolver(Ipv4FirstResolver)

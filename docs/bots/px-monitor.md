@@ -1,21 +1,21 @@
 # PX-Monitor
 
-Bot Telegram modular (owner-only) untuk memantau balance/pemakaian/budget API InferHub sekaligus endpoint HTTP/API global.
+A modular, owner-only Telegram bot for monitoring InferHub API balance/usage/budgets alongside arbitrary global HTTP endpoints.
 
-## Fitur Utama
+## Key Features
 
-- **Dashboard Live:** Ringkasan status & balance InferHub, ringkasan endpoint `MONITOR_TARGETS`, interval polling, dan ambang batas alert.
-- **Modul InferHub (opsional bila `INFERHUB_API_KEY` diset):**
-  - `/status` & `/check`: Akun, balance, pending, health check `- [x]`.
-  - `/usage` & `/today`: Ringkasan 30 hari, top model breakdown di `<details>`, dan cache hit visual bar hari ini.
-  - `/breakdown`: Rincian per model.
-  - `/budget` & `/setbudget <pct>`: Diskon minimum default dengan konfirmasi 2 langkah in-place.
-  - `/keys`: Daftar API key terdaftar.
-- **Modul Global Targets (`MONITOR_TARGETS`):**
-  - Format: `Nama|URL;Nama2|URL2`.
-  - `/targets` menampilkan tabel status HTTP & latency ms live.
-- **Background Alert + Recovery:** Thread latar independen mengecek balance rendah, error API, dan target down/pulih dengan deduplikasi state.
+- **Live Dashboard:** Instant summary of InferHub account status & balance, global `MONITOR_TARGETS` health, polling interval, and alert threshold.
+- **InferHub Module (enabled when `INFERHUB_API_KEY` is set):**
+  - `/status` & `/check`: Account health, balance, pending funds, and native `- [x]` checks.
+  - `/usage` & `/today`: 30-day summary, collapsible top-model breakdown, and today's cache-hit progress bar.
+  - `/breakdown`: Per-model request, token, and cost breakdown.
+  - `/budget` & `/setbudget <pct>`: Account-wide minimum discount with in-place 2-step confirmation.
+  - `/keys`: Registered API keys table.
+- **Global Targets Module (`MONITOR_TARGETS`):**
+  - Format: `Name|URL;Name2|URL2`.
+  - `/targets` probes all configured endpoints and reports live HTTP status codes and latency (ms).
+- **Background Alerts & Recovery:** Independent checker thread sends rich alert and recovery notifications with state deduplication.
 
-## Konfigurasi
+## Configuration
 
-Lihat [crates/px-monitor/.env.example](../../crates/px-monitor/.env.example).
+See [crates/px-monitor/.env.example](../../crates/px-monitor/.env.example).

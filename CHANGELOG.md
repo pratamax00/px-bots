@@ -1,23 +1,24 @@
 # Changelog
 
-Semua perubahan penting pada monorepo **PX Bots** dicatat di sini mengikuti format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan [Semantic Versioning](https://semver.org/).
+All notable changes to **PX Bots** are documented in this file following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
+
+## [0.1.1] - 2026-11-21
+
+### Changed
+- Standardized the entire project to **100% English**: all bot UI copy, button labels, slash command descriptions, alerts, progress strings, code comments, scripts, and documentation across `tg-core`, `px-media`, and `px-monitor`.
+- Added the 100% English project rule to `AGENTS.md`.
 
 ## [0.1.0] - 2026-11-21
 
 ### Added
-- Fondasi monorepo Rust Cargo Workspace (`px-bots`) dengan target static binary `x86_64-unknown-linux-musl`.
-- Shared core crate **`tg-core`**:
-  - HTTP client `ureq` + `rustls` (IPv4-first resolver, zero-tokio).
-  - `TgClient` dengan `sendRichMessage`, in-place `editMessageText`, fallback HTML otomatis, dan non-blocking `answerCallbackQuery` (1x RTT).
-  - Primitif UI Bot API 10.3+: `field_grid`, `table_markdown` (`|:---|:---|`), `hl` (`==...==`), `details_block`, native `<tg-button>` (`url`, `callback_data`, `copy_text`), `progress_bar`, dan `stamp_wib`.
-  - Persistensi state JSON atomik ber-permission `0600`.
+- Initial Rust Cargo Workspace monorepo (`px-bots`) targeting static `x86_64-unknown-linux-musl` binaries.
+- Shared **`tg-core`** crate:
+  - Blocking HTTP client via `ureq` + `rustls` (IPv4-first DNS resolver, zero-tokio).
+  - `TgClient` with rich-first `sendRichMessage`, in-place `editMessageText`, automatic HTML fallback, and non-blocking `answerCallbackQuery` (1x RTT).
+  - Bot API 10.3+ UI helpers: `field_grid`, canonical `table_markdown` (`|:---|:---|`), `hl` (`==...==`), `details_block`, native `<tg-button>` (`url`, `callback_data`, `copy_text`), `progress_bar`, and `stamp_wib`.
+  - Atomic JSON state persistence (`0600`).
 - **`px-media`**:
-  - Rebrand penuh dari downloader media lama ke Rust + `tg-core`.
-  - Dashboard Bot API 10.3+ dengan visual storage bar, smart status Jellyfin real-time, tombol folder aktif hijau edit di tempat, menu `🕒 Terbaru` (`/recent`), tombol `📋 Salin Path` / `📋 Salin IP`.
-  - Unduhan Google Drive (`gdrive-dl`) & Pixeldrain (`/u/<id>`) dengan progres 1 baris in-place replace + ETA serta laporan akhir full rich.
+  - Full Rust rewrite of the media downloader with Bot API 10.3+ dashboard, live storage bar, smart Jellyfin status probe, active-folder green toggle button, `Recent` (`/recent`) browser, `Copy Path` / `Copy IP` pills, 1-line live progress replace with ETA, and rich completion/error reports.
 - **`px-monitor`**:
-  - Rebrand penuh & perluasan global dari monitor InferHub lama ke Rust + `tg-core`.
-  - Dashboard live + sub-menu in-place edit (`Status`, `Usage`, `Hari Ini`, `Breakdown`, `Budget` 2-step confirm, `Keys`).
-  - Modul global `🌐 Targets` (`/targets`) lewat env `MONITOR_TARGETS` untuk memantau endpoint HTTP/API tambahan beserta latency.
-  - Background periodic checker non-blocking dengan alert rich + notifikasi recovery otomatis.
-- Dokumentasi awal (`README.md`, `AGENTS.md`, `docs/architecture.md`, `docs/deploy-runbook.md`, `docs/bots/`), skrip `scripts/privacy-check.sh` & `scripts/deploy.sh`, dan workflow GitHub Actions `.github/workflows/release.yml`.
+  - Full Rust rewrite & modular expansion: live InferHub dashboard, in-place sub-menus (`Status`, `Usage`, `Today`, `Breakdown`, 2-step `Budget`, `Keys`), global HTTP endpoint probing via `MONITOR_TARGETS`, and non-blocking background alert + recovery checker.
+- Full docs (`README.md`, `AGENTS.md`, `docs/`), `scripts/privacy-check.sh`, `scripts/deploy.sh`, and GitHub Actions release pipeline (`.github/workflows/release.yml`).

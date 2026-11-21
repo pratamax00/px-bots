@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Escape sel tabel GFM agar karakter `|` atau newline tidak memecah kolom.
+/// Escapes GFM table cells so pipes and newlines never break table layout.
 pub fn md_cell(value: &str) -> String {
     value
         .replace('|', "\\|")
@@ -12,7 +12,7 @@ pub fn md_cell(value: &str) -> String {
         .to_string()
 }
 
-/// Netralkan karakter kontrol markdown untuk nilai dinamis eksternal.
+/// Escapes dynamic external strings so Markdown control characters render literally.
 pub fn md_text(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for ch in value.chars() {
@@ -28,12 +28,12 @@ pub fn md_text(value: &str) -> String {
     out.trim().to_string()
 }
 
-/// Stabilo / highlight Bot API 10.3+ (`==teks==`).
+/// Bot API 10.3+ inline highlight (`==text==`).
 pub fn hl(text: &str) -> String {
     format!("=={text}==")
 }
 
-/// Tabel GFM kanonik dengan separator seragam `|:---|:---|`.
+/// Canonical GFM table with uniform left-aligned separator (`|:---|:---|`).
 pub fn table_markdown(headers: &[&str], rows: &[Vec<String>]) -> String {
     if headers.is_empty() {
         return String::new();
@@ -55,7 +55,7 @@ pub fn table_markdown(headers: &[&str], rows: &[Vec<String>]) -> String {
     lines.join("\n")
 }
 
-/// Grid 2 kolom kanonik `Field | Value`.
+/// Canonical 2-column `Field | Value` grid.
 pub fn field_grid(pairs: &[(&str, String)]) -> String {
     let rows: Vec<Vec<String>> = pairs
         .iter()
@@ -64,7 +64,7 @@ pub fn field_grid(pairs: &[(&str, String)]) -> String {
     table_markdown(&["Field", "Value"], &rows)
 }
 
-/// Blok lipat `<details><summary>...</summary>` untuk detail sekunder.
+/// Collapsible `<details><summary>...</summary>` block for secondary info.
 pub fn details_block(summary: &str, content: &str) -> String {
     format!("<details>\n<summary>{summary}</summary>\n\n{content}\n\n</details>")
 }
@@ -82,7 +82,7 @@ pub fn esc_html(s: &str) -> String {
         .replace('>', "&gt;")
 }
 
-/// Tombol oval native `<tg-button type="url">` di dalam bubble pesan.
+/// Native in-bubble URL pill button (`<tg-button type="url">`).
 pub fn tg_url_button(label: &str, url: &str) -> String {
     format!(
         "<tg-button type=\"url\" url=\"{}\">{label}</tg-button>",
@@ -90,7 +90,7 @@ pub fn tg_url_button(label: &str, url: &str) -> String {
     )
 }
 
-/// Tombol oval native `<tg-button type="callback_data">` di dalam bubble pesan.
+/// Native in-bubble callback pill button (`<tg-button type="callback_data">`).
 pub fn tg_cb_button(label: &str, data: &str) -> String {
     format!(
         "<tg-button type=\"callback_data\" data=\"{}\">{label}</tg-button>",
@@ -98,7 +98,7 @@ pub fn tg_cb_button(label: &str, data: &str) -> String {
     )
 }
 
-/// Tombol oval native `<tg-button type="copy_text">` sekali tap salin ke clipboard.
+/// Native in-bubble one-tap copy pill button (`<tg-button type="copy_text">`).
 pub fn tg_copy_button(label: &str, text: &str) -> String {
     format!(
         "<tg-button type=\"copy_text\" text=\"{}\">{label}</tg-button>",
@@ -106,7 +106,7 @@ pub fn tg_copy_button(label: &str, text: &str) -> String {
     )
 }
 
-/// Baris tombol oval native `<tg-button-row>`.
+/// Native pill button row (`<tg-button-row>`).
 pub fn tg_button_row(buttons: &[String]) -> String {
     format!(
         "<tg-button-row align=\"left\">{}</tg-button-row>",
@@ -114,7 +114,7 @@ pub fn tg_button_row(buttons: &[String]) -> String {
     )
 }
 
-/// Tombol inline keyboard dengan warna Bot API (`primary`, `success`, `danger`, atau polos `""`).
+/// Inline keyboard button with optional Bot API style (`primary`, `success`, `danger`, or `""`).
 pub fn button(text: &str, data: &str, style: &str) -> Value {
     let mut b = json!({"text": text, "callback_data": data});
     if matches!(style, "primary" | "success" | "danger") {
@@ -123,7 +123,7 @@ pub fn button(text: &str, data: &str, style: &str) -> Value {
     b
 }
 
-/// Susun daftar tombol inline menjadi grid maksimal 2 tombol per baris.
+/// Arranges inline buttons into rows of up to 2 buttons each.
 pub fn rows(buttons: Vec<Value>) -> Value {
     let mut out = Vec::new();
     let mut chunk = Vec::with_capacity(2);
@@ -139,7 +139,7 @@ pub fn rows(buttons: Vec<Value>) -> Value {
     Value::Array(out)
 }
 
-/// Fallback converter Markdown Bot API 10.3+ -> HTML aman bila `sendRichMessage` ditolak.
+/// Safe fallback Markdown -> HTML converter when `sendRichMessage` is rejected.
 pub fn markdown_to_html(md: &str) -> String {
     static RE_TG_BTN: OnceLock<Regex> = OnceLock::new();
     static RE_DETAILS: OnceLock<Regex> = OnceLock::new();
@@ -229,7 +229,7 @@ pub fn progress_bar(ratio: f64, width: usize) -> String {
     format!("{}{}", "▓".repeat(filled), "░".repeat(empty))
 }
 
-/// Stempel waktu WIB (UTC+7): `"21 Nov 2026, 09:15 WIB"`.
+/// WIB (UTC+7) timestamp string: `"21 Nov 2026, 09:15 WIB"`.
 pub fn stamp_wib() -> String {
     let secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -257,7 +257,7 @@ pub fn format_epoch_wib(wib_secs: i64) -> String {
     let year = if m <= 2 { y + 1 } else { y };
 
     const MONTHS: [&str; 12] = [
-        "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ];
     let mon = MONTHS[(m as usize).saturating_sub(1).min(11)];
     format!("{d:02} {mon} {year}, {hour:02}:{min:02} WIB")
@@ -283,12 +283,12 @@ mod tests {
     #[test]
     fn test_buttons_and_html_fallback() {
         assert_eq!(
-            tg_copy_button("Salin", "/data/media"),
-            "<tg-button type=\"copy_text\" text=\"/data/media\">Salin</tg-button>"
+            tg_copy_button("Copy", "/data/media"),
+            "<tg-button type=\"copy_text\" text=\"/data/media\">Copy</tg-button>"
         );
         assert_eq!(
-            markdown_to_html("**Judul** ==OK== `x`"),
-            "<b>Judul</b> <b>[OK]</b> <code>x</code>"
+            markdown_to_html("**Title** ==OK== `x`"),
+            "<b>Title</b> <b>[OK]</b> <code>x</code>"
         );
     }
 

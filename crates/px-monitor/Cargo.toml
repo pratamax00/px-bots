@@ -3,7 +3,7 @@ name = "px-monitor"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "PX-Monitor — bot Telegram modular untuk monitoring kuota/API InferHub dan endpoint HTTP global"
+description = "PX-Monitor — modular Telegram bot for InferHub quota/API monitoring and global HTTP endpoint probes"
 
 [dependencies]
 serde.workspace = true

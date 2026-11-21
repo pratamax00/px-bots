@@ -18,7 +18,7 @@ use tg_core::{log_error, log_info, log_warn};
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const UA: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36";
 
-// ── konfigurasi (100% env-only) ─────────────────────────────────────────────
+// ── configuration (100% env-only) ───────────────────────────────────────────
 #[derive(Clone, Debug, PartialEq)]
 struct HttpTarget {
     name: String,
@@ -64,17 +64,17 @@ impl Config {
     fn from_env() -> Result<Self, String> {
         let tg_token = env::var("TG_TOKEN")
             .or_else(|_| env::var("TELEGRAM_BOT_TOKEN"))
-            .map_err(|_| "Env TG_TOKEN wajib diset".to_string())?;
+            .map_err(|_| "TG_TOKEN environment variable is required".to_string())?;
         if tg_token.trim().is_empty() {
-            return Err("Env TG_TOKEN kosong".to_string());
+            return Err("TG_TOKEN is empty".to_string());
         }
         let owner_raw = env::var("OWNER_ID")
             .or_else(|_| env::var("TELEGRAM_OWNER_ID"))
-            .map_err(|_| "Env OWNER_ID wajib diset".to_string())?;
+            .map_err(|_| "OWNER_ID environment variable is required".to_string())?;
         let owner_id = owner_raw
             .trim()
             .parse::<i64>()
-            .map_err(|e| format!("OWNER_ID tidak valid: {e}"))?;
+            .map_err(|e| format!("Invalid OWNER_ID: {e}"))?;
 
         let state_file = PathBuf::from(
             env::var("STATE_FILE").unwrap_or_else(|_| "./state/px-monitor.json".to_string()),
@@ -170,7 +170,7 @@ impl App {
 
     fn ih_get(&self, path: &str) -> Result<Value, String> {
         if !self.cfg.has_inferhub() {
-            return Err("INFERHUB_API_KEY belum diset".to_string());
+            return Err("INFERHUB_API_KEY is not configured".to_string());
         }
         let url = format!("{}{path}", self.cfg.inferhub_base);
         let resp = match self
@@ -192,12 +192,12 @@ impl App {
         if raw.is_empty() {
             return Ok(json!({}));
         }
-        serde_json::from_str(&raw).map_err(|e| format!("JSON decode gagal: {e}"))
+        serde_json::from_str(&raw).map_err(|e| format!("JSON decode failed: {e}"))
     }
 
     fn ih_put(&self, path: &str, payload: Value) -> Result<Value, String> {
         if !self.cfg.has_inferhub() {
-            return Err("INFERHUB_API_KEY belum diset".to_string());
+            return Err("INFERHUB_API_KEY is not configured".to_string());
         }
         let url = format!("{}{path}", self.cfg.inferhub_base);
         let resp = match self
@@ -220,7 +220,7 @@ impl App {
         if raw.is_empty() {
             return Ok(json!({}));
         }
-        serde_json::from_str(&raw).map_err(|e| format!("JSON decode gagal: {e}"))
+        serde_json::from_str(&raw).map_err(|e| format!("JSON decode failed: {e}"))
     }
 
     fn probe_target(&self, t: &HttpTarget) -> (bool, String, u128) {
@@ -242,10 +242,10 @@ impl App {
         }
     }
 
-    // ── renderers Bot API 10.3+ ─────────────────────────────────────────────
+    // ── Bot API 10.3+ renderers ─────────────────────────────────────────────
     fn dashboard_text(&self) -> String {
         let ih_summary = if !self.cfg.has_inferhub() {
-            "⏸️ Nonaktif".to_string()
+            "⏸️ Disabled".to_string()
         } else {
             match self.ih_get("/me") {
                 Ok(me) => {
@@ -263,7 +263,7 @@ impl App {
         };
 
         let targets_summary = if self.cfg.targets.is_empty() {
-            "Belum diset".to_string()
+            "None configured".to_string()
         } else {
             let ok_cnt = self
                 .cfg
@@ -282,7 +282,7 @@ impl App {
         let grid = field_grid(&[
             ("InferHub", ih_summary),
             ("Targets", targets_summary),
-            ("Interval", hl(&format!("{} dtk", self.cfg.poll_seconds))),
+            ("Interval", hl(&format!("{}s", self.cfg.poll_seconds))),
             (
                 "Threshold",
                 format!("`{}`", fmt_usdc(self.cfg.low_balance_usdc)),
@@ -290,22 +290,22 @@ impl App {
         ]);
 
         let pills = tg_button_row(&[
-            tg_cb_button("🔄 Segarkan", "cmd:menu"),
+            tg_cb_button("🔄 Refresh", "cmd:menu"),
             tg_cb_button("📊 Status", "cmd:status"),
             tg_cb_button("📈 Usage", "cmd:usage"),
             tg_cb_button("🌐 Targets", "cmd:targets"),
         ]);
 
         let guide = table_markdown(
-            &["Command", "Fungsi"],
+            &["Command", "Description"],
             &[
-                vec!["`/menu`".into(), "Dashboard utama".into()],
-                vec!["`/status` · `/check`".into(), "Akun & balance InferHub".into()],
-                vec!["`/usage` · `/today`".into(), "Pemakaian 30 hari & hari ini".into()],
-                vec!["`/breakdown`".into(), "Rincian per model".into()],
-                vec!["`/budget` · `/setbudget`".into(), "Diskon default akun".into()],
-                vec!["`/keys`".into(), "Daftar API key".into()],
-                vec!["`/targets`".into(), "Cek endpoint HTTP global".into()],
+                vec!["`/menu`".into(), "Live monitor dashboard".into()],
+                vec!["`/status` · `/check`".into(), "InferHub account & balance".into()],
+                vec!["`/usage` · `/today`".into(), "30-day & today's token usage".into()],
+                vec!["`/breakdown`".into(), "Per-model usage breakdown".into()],
+                vec!["`/budget` · `/setbudget`".into(), "Account-wide min discount".into()],
+                vec!["`/keys`".into(), "Registered API keys".into()],
+                vec!["`/targets`".into(), "Probe global HTTP endpoints".into()],
             ],
         );
 
@@ -320,7 +320,7 @@ impl App {
             String::new(),
             "---".to_string(),
             String::new(),
-            details_block("Panduan & Command", &guide),
+            details_block("Commands & Guide", &guide),
         ]
         .join("\n")
     }
@@ -359,18 +359,18 @@ impl App {
         ]);
 
         let chk_acc = if ok_acc {
-            "- [x] API account reachable & active"
+            "- [x] Account API reachable & active"
         } else {
-            "- [ ] API account tidak aktif"
+            "- [ ] Account is not active"
         };
         let chk_bal = if ok_bal {
-            "- [x] Balance di atas ambang aman"
+            "- [x] Balance above alert threshold"
         } else {
-            "- [ ] Balance di bawah ambang aman — perlu top-up"
+            "- [ ] Balance below threshold — top-up recommended"
         };
 
         let pills = tg_button_row(&[
-            tg_cb_button("🔄 Segarkan", "cmd:status"),
+            tg_cb_button("🔄 Refresh", "cmd:status"),
             tg_cb_button("📈 Usage", "cmd:usage"),
             tg_cb_button("📁 Menu", "cmd:menu"),
         ]);
@@ -439,18 +439,18 @@ impl App {
         ]);
 
         let pills = tg_button_row(&[
-            tg_cb_button("🔄 Segarkan", "cmd:usage"),
-            tg_cb_button("📅 Hari Ini", "cmd:today"),
+            tg_cb_button("🔄 Refresh", "cmd:usage"),
+            tg_cb_button("📅 Today", "cmd:today"),
             tg_cb_button("📁 Menu", "cmd:menu"),
         ]);
 
         Ok([
-            format!("**📈 PX-Monitor · Usage 30 Hari** · {}", hl("InferHub")),
+            format!("**📈 PX-Monitor · 30-Day Usage** · {}", hl("InferHub")),
             String::new(),
             summary,
             String::new(),
             "- [x] Usage API reachable".to_string(),
-            "- [x] Token & cost terukur langsung dari server".to_string(),
+            "- [x] Token & cost metrics fetched live".to_string(),
             String::new(),
             format!("_{}_", stamp_wib()),
             String::new(),
@@ -459,8 +459,8 @@ impl App {
             "---".to_string(),
             String::new(),
             details_block(
-                "Model Breakdown (25 log terakhir)",
-                &table_markdown(&["Model", "Req", "Tokens", "USDC"], &model_rows),
+                "Model Breakdown (last 25 logs)",
+                &table_markdown(&["Model", "Reqs", "Tokens", "USDC"], &model_rows),
             ),
         ]
         .join("\n"))
@@ -501,17 +501,17 @@ impl App {
             truncate_str(d.get("to").and_then(Value::as_str).unwrap_or("—"), 16).replace('T', " ");
 
         let pills = tg_button_row(&[
-            tg_cb_button("🔄 Segarkan", "cmd:today"),
+            tg_cb_button("🔄 Refresh", "cmd:today"),
             tg_cb_button("📋 Breakdown", "cmd:breakdown"),
             tg_cb_button("📁 Menu", "cmd:menu"),
         ]);
 
         Ok([
-            format!("**📅 PX-Monitor · Hari Ini** · {}", hl("UTC 00:00")),
+            format!("**📅 PX-Monitor · Today** · {}", hl("Since 00:00 UTC")),
             String::new(),
             field_grid(&pairs),
             String::new(),
-            format!("Rentang: `{from} → {to}`"),
+            format!("Window: `{from} → {to}`"),
             format!("_{}_", stamp_wib()),
             String::new(),
             pills,
@@ -550,24 +550,22 @@ impl App {
             }
         }
         let extra = if arr.len() > 12 {
-            format!("\n_…dan {} model lainnya._", arr.len() - 12)
+            format!("_…and {} more models._", arr.len() - 12)
         } else {
             String::new()
         };
 
         let pills = tg_button_row(&[
-            tg_cb_button("🔄 Segarkan", "cmd:breakdown"),
+            tg_cb_button("🔄 Refresh", "cmd:breakdown"),
             tg_cb_button("📈 Usage", "cmd:usage"),
             tg_cb_button("📁 Menu", "cmd:menu"),
         ]);
 
         Ok([
             format!("**📋 PX-Monitor · Breakdown** · {}", hl(rng)),
-            String::new(),
-            table_markdown(&["Model", "Req", "Tokens", "USDC"], &model_rows),
+            table_markdown(&["Model", "Reqs", "Tokens", "USDC"], &model_rows),
             extra,
             format!("_{}_", stamp_wib()),
-            String::new(),
             pills,
         ]
         .into_iter()
@@ -588,9 +586,9 @@ impl App {
             .map(|v| v >= self.cfg.budget_min_pct)
             .unwrap_or(false);
         let wait_txt = match wait {
-            Some(Value::Number(n)) => format!("{n} dtk"),
-            Some(Value::String(s)) if !s.is_empty() => format!("{s} dtk"),
-            _ => "tanpa antre".to_string(),
+            Some(Value::Number(n)) => format!("{n}s"),
+            Some(Value::String(s)) if !s.is_empty() => format!("{s}s"),
+            _ => "no queue".to_string(),
         };
         let cov_ratio = if total > 0 {
             covered as f64 / total as f64
@@ -600,11 +598,11 @@ impl App {
 
         let grid = field_grid(&[
             (
-                "Diskon Min",
+                "Min Discount",
                 hl(&format!("{} {pct_str}%", if pct_ok { "✅" } else { "⚠️" })),
             ),
             (
-                "Batas Aman",
+                "Safe Range",
                 format!(
                     "`{} – {}%`",
                     self.cfg.budget_min_pct, self.cfg.budget_max_pct
@@ -612,7 +610,7 @@ impl App {
             ),
             ("Queue Wait", format!("`{wait_txt}`")),
             (
-                "Cakupan",
+                "Coverage",
                 format!(
                     "{} {}",
                     progress_bar(cov_ratio, 8),
@@ -622,13 +620,13 @@ impl App {
         ]);
 
         let warn_line = if gap > 0 {
-            format!("⚠️ **{gap} model belum ter-cover** oleh budget default.")
+            format!("⚠️ **{gap} models uncovered** by the default budget.")
         } else {
-            "✅ Seluruh model ter-cover budget default.".to_string()
+            "✅ All models covered by the default budget.".to_string()
         };
 
         Ok([
-            format!("**💰 PX-Monitor · Budget Default** · {}", hl("InferHub")),
+            format!("**💰 PX-Monitor · Default Budget** · {}", hl("InferHub")),
             String::new(),
             grid,
             String::new(),
@@ -661,7 +659,7 @@ impl App {
                         .get("lastUsedAt")
                         .and_then(Value::as_str)
                         .map(|s| truncate_str(s, 16).replace('T', " "))
-                        .unwrap_or_else(|| "belum".to_string());
+                        .unwrap_or_else(|| "never".to_string());
                     vec![
                         format!("`{}`", truncate_str(nm, 18)),
                         format!("`{pre}…`"),
@@ -672,17 +670,17 @@ impl App {
         };
 
         let pills = tg_button_row(&[
-            tg_cb_button("🔄 Segarkan", "cmd:keys"),
+            tg_cb_button("🔄 Refresh", "cmd:keys"),
             tg_cb_button("📁 Menu", "cmd:menu"),
         ]);
 
         Ok([
             format!(
                 "**🔑 PX-Monitor · API Keys** · {}",
-                hl(&format!("{} terdaftar", arr.len()))
+                hl(&format!("{} active", arr.len()))
             ),
             String::new(),
-            table_markdown(&["Nama", "Prefix", "Terakhir Dipakai"], &rows_data),
+            table_markdown(&["Name", "Prefix", "Last Used"], &rows_data),
             String::new(),
             format!("_{}_", stamp_wib()),
             String::new(),
@@ -694,17 +692,17 @@ impl App {
     fn targets_text(&self) -> String {
         if self.cfg.targets.is_empty() {
             return [
-                format!("**🌐 PX-Monitor · Global Targets** · {}", hl("Kosong")),
+                format!("**🌐 PX-Monitor · Global Targets** · {}", hl("Empty")),
                 String::new(),
-                "Belum ada endpoint tambahan di `MONITOR_TARGETS`.".to_string(),
+                "No custom HTTP targets configured in `MONITOR_TARGETS` yet.".to_string(),
                 String::new(),
                 format!("_{}_", stamp_wib()),
                 String::new(),
                 "---".to_string(),
                 String::new(),
                 details_block(
-                    "Cara Tambah Target",
-                    "Set variabel `MONITOR_TARGETS` di `runtime.env`:\n`MONITOR_TARGETS=Web|https://example.com;API|http://127.0.0.1:8080/health`",
+                    "How to Add Targets",
+                    "Set `MONITOR_TARGETS` in `runtime.env`:\n`MONITOR_TARGETS=Web|https://example.com;API|http://127.0.0.1:8080/health`",
                 ),
             ]
             .join("\n");
@@ -729,7 +727,7 @@ impl App {
         }
 
         let pills = tg_button_row(&[
-            tg_cb_button("🔄 Cek Ulang", "cmd:targets"),
+            tg_cb_button("🔄 Re-probe", "cmd:targets"),
             tg_cb_button("📁 Menu", "cmd:menu"),
         ]);
 
@@ -753,10 +751,10 @@ impl App {
             .trim()
             .trim_end_matches('%')
             .parse::<f64>()
-            .map_err(|_| "Angka tidak valid. Contoh: `/setbudget 95`".to_string())?;
+            .map_err(|_| "Invalid number. Example: `/setbudget 95`".to_string())?;
         if v < self.cfg.budget_min_pct || v > self.cfg.budget_max_pct {
             return Err(format!(
-                "Ditolak: harus antara `{}%` dan `{}%` (diberikan `{v}%`).",
+                "Rejected: must be between `{}%` and `{}%` (got `{v}%`).",
                 self.cfg.budget_min_pct, self.cfg.budget_max_pct
             ));
         }
@@ -775,15 +773,15 @@ impl App {
                     });
                 }
                 let card = [
-                    format!("**⚠️ PX-Monitor · Konfirmasi Budget** · {}", hl("Akun-Wide")),
+                    format!("**⚠️ PX-Monitor · Confirm Budget** · {}", hl("Account-Wide")),
                     String::new(),
                     field_grid(&[
-                        ("Diskon Sekarang", format!("`{before}%`")),
-                        ("Diskon Baru", hl(&format!("{pct}%"))),
-                        ("Model Terdampak", format!("`{total}`")),
+                        ("Current Discount", format!("`{before}%`")),
+                        ("New Discount", hl(&format!("{pct}%"))),
+                        ("Affected Models", format!("`{total}`")),
                     ]),
                     String::new(),
-                    "Tekan tombol di bawah untuk menerapkan atau membatalkan.".to_string(),
+                    "Tap below to apply or cancel this change.".to_string(),
                     format!("_{}_", stamp_wib()),
                 ]
                 .join("\n");
@@ -791,7 +789,7 @@ impl App {
             }
             Err(e) => {
                 self.tg
-                    .present(msg_id, &error_card("Gagal baca budget", &e), Some(kb_main()));
+                    .present(msg_id, &error_card("Budget Fetch Failed", &e), Some(kb_main()));
             }
         }
     }
@@ -806,10 +804,10 @@ impl App {
                     let mut st = self.state.lock().unwrap();
                     if low && !st.last_low {
                         let card = [
-                            format!("**⚠️ PX-Monitor · Balance Rendah** · {}", hl("Alert")),
+                            format!("**⚠️ PX-Monitor · Low Balance** · {}", hl("Alert")),
                             String::new(),
                             field_grid(&[
-                                ("Layanan", "InferHub".into()),
+                                ("Service", "InferHub".into()),
                                 ("Balance", hl(&fmt_usdc(bal))),
                                 ("Threshold", format!("`{}`", fmt_usdc(self.cfg.low_balance_usdc))),
                             ]),
@@ -820,8 +818,8 @@ impl App {
                         self.tg.send(&card, Some(kb_back()));
                     } else if !low && st.last_low {
                         let card = format!(
-                            "**✅ PX-Monitor · Balance Pulih** · {}\n\nBalance InferHub kini {}.\n\n_{}_",
-                            hl("Pulih"),
+                            "**✅ PX-Monitor · Balance Recovered** · {}\n\nInferHub balance is now {}.\n\n_{}_",
+                            hl("Recovered"),
                             hl(&fmt_usdc(bal)),
                             stamp_wib()
                         );
@@ -869,8 +867,8 @@ impl App {
                 self.persist_state(&st);
             } else if ok && was_down {
                 let card = format!(
-                    "**✅ PX-Monitor · Target Pulih** · {}\n\n**{}** kembali online ({}, `{ms} ms`).\n\n_{}_",
-                    hl("Pulih"),
+                    "**✅ PX-Monitor · Target Recovered** · {}\n\n**{}** is back online ({}, `{ms} ms`).\n\n_{}_",
+                    hl("Recovered"),
                     t.name,
                     hl(&label),
                     stamp_wib()
@@ -920,7 +918,7 @@ fn error_card(title: &str, err: &str) -> String {
         String::new(),
         "---".to_string(),
         String::new(),
-        details_block("Detail Error", &format!("`{}`", truncate_str(err, 280))),
+        details_block("Error Details", &format!("`{}`", truncate_str(err, 280))),
     ]
     .join("\n")
 }
@@ -931,12 +929,12 @@ fn kb_main() -> Value {
         "inline_keyboard": rows(vec![
             button("📊 Status", "cmd:status", "primary"),
             button("📈 Usage", "cmd:usage", "primary"),
-            button("📅 Hari Ini", "cmd:today", "primary"),
+            button("📅 Today", "cmd:today", "primary"),
             button("📋 Breakdown", "cmd:breakdown", "primary"),
             button("💰 Budget", "cmd:budget", "primary"),
             button("🔑 Keys", "cmd:keys", "primary"),
             button("🌐 Targets", "cmd:targets", "primary"),
-            button("🔄 Cek Semua", "cmd:menu", "success"),
+            button("🔄 Check All", "cmd:menu", "success"),
         ])
     })
 }
@@ -944,8 +942,8 @@ fn kb_main() -> Value {
 fn kb_back() -> Value {
     json!({
         "inline_keyboard": [[
-            button("📁 Menu Utama", "cmd:menu", "primary"),
-            button("🔄 Cek Status", "cmd:status", ""),
+            button("📁 Dashboard", "cmd:menu", "primary"),
+            button("🔄 Status", "cmd:status", ""),
         ]]
     })
 }
@@ -962,7 +960,7 @@ fn kb_budget() -> Value {
                 button("98%", "set:98.00", ""),
                 button("99%", "set:99.00", ""),
             ],
-            [button("📁 Menu Utama", "cmd:menu", "primary")],
+            [button("📁 Dashboard", "cmd:menu", "primary")],
         ]
     })
 }
@@ -971,15 +969,15 @@ fn kb_confirm(pct: &str) -> Value {
     json!({
         "inline_keyboard": [
             [
-                button(&format!("✅ Terapkan {pct}%"), "do:confirm", "success"),
-                button("❌ Batal", "do:cancel", "danger"),
+                button(&format!("✅ Apply {pct}%"), "do:confirm", "success"),
+                button("❌ Cancel", "do:cancel", "danger"),
             ],
-            [button("📁 Menu Utama", "cmd:menu", "primary")],
+            [button("📁 Dashboard", "cmd:menu", "primary")],
         ]
     })
 }
 
-// ── router aksi ─────────────────────────────────────────────────────────────
+// ── action router ───────────────────────────────────────────────────────────
 fn run_action(app: &Arc<App>, action: &str, msg_id: Option<i64>) {
     match action {
         "menu" | "start" | "help" => {
@@ -991,7 +989,7 @@ fn run_action(app: &Arc<App>, action: &str, msg_id: Option<i64>) {
             }
             Err(e) => {
                 app.tg
-                    .present(msg_id, &error_card("Status Gagal", &e), Some(kb_main()));
+                    .present(msg_id, &error_card("Status Failed", &e), Some(kb_main()));
             }
         },
         "usage" => match app.usage_text() {
@@ -1000,7 +998,7 @@ fn run_action(app: &Arc<App>, action: &str, msg_id: Option<i64>) {
             }
             Err(e) => {
                 app.tg
-                    .present(msg_id, &error_card("Usage Gagal", &e), Some(kb_main()));
+                    .present(msg_id, &error_card("Usage Failed", &e), Some(kb_main()));
             }
         },
         "today" => match app.today_text() {
@@ -1009,7 +1007,7 @@ fn run_action(app: &Arc<App>, action: &str, msg_id: Option<i64>) {
             }
             Err(e) => {
                 app.tg
-                    .present(msg_id, &error_card("Hari Ini Gagal", &e), Some(kb_main()));
+                    .present(msg_id, &error_card("Today Failed", &e), Some(kb_main()));
             }
         },
         "breakdown" => match app.breakdown_text() {
@@ -1018,7 +1016,7 @@ fn run_action(app: &Arc<App>, action: &str, msg_id: Option<i64>) {
             }
             Err(e) => {
                 app.tg
-                    .present(msg_id, &error_card("Breakdown Gagal", &e), Some(kb_main()));
+                    .present(msg_id, &error_card("Breakdown Failed", &e), Some(kb_main()));
             }
         },
         "keys" => match app.keys_text() {
@@ -1027,7 +1025,7 @@ fn run_action(app: &Arc<App>, action: &str, msg_id: Option<i64>) {
             }
             Err(e) => {
                 app.tg
-                    .present(msg_id, &error_card("Keys Gagal", &e), Some(kb_main()));
+                    .present(msg_id, &error_card("Keys Failed", &e), Some(kb_main()));
             }
         },
         "targets" => {
@@ -1039,7 +1037,7 @@ fn run_action(app: &Arc<App>, action: &str, msg_id: Option<i64>) {
             }
             Err(e) => {
                 app.tg
-                    .present(msg_id, &error_card("Budget Gagal", &e), Some(kb_main()));
+                    .present(msg_id, &error_card("Budget Failed", &e), Some(kb_main()));
             }
         },
         "cancel" => {
@@ -1058,13 +1056,13 @@ fn run_action(app: &Arc<App>, action: &str, msg_id: Option<i64>) {
             {
                 Ok(after) => {
                     let card = [
-                        format!("**✅ PX-Monitor · Budget Diterapkan** · {}", hl("Selesai")),
+                        format!("**✅ PX-Monitor · Budget Updated** · {}", hl("Applied")),
                         String::new(),
                         field_grid(&[
-                            ("Sebelum", format!("`{}%`", p.before)),
-                            ("Sesudah", hl(&format!("{}%", val_as_string(after.get("minDiscountPct"))))),
+                            ("Before", format!("`{}%`", p.before)),
+                            ("After", hl(&format!("{}%", val_as_string(after.get("minDiscountPct"))))),
                             (
-                                "Model Ter-cover",
+                                "Models Covered",
                                 hl(&format!(
                                     "{} / {}",
                                     val_i64(after.get("coveredCount")),
@@ -1080,7 +1078,7 @@ fn run_action(app: &Arc<App>, action: &str, msg_id: Option<i64>) {
                 }
                 Err(e) => {
                     app.tg
-                        .present(msg_id, &error_card("Terapkan Budget Gagal", &e), Some(kb_main()));
+                        .present(msg_id, &error_card("Apply Budget Failed", &e), Some(kb_main()));
                 }
             }
         }
@@ -1097,7 +1095,7 @@ fn handle_callback(app: &Arc<App>, cb: &Value) {
     let msg_id = cb.pointer("/message/message_id").and_then(Value::as_i64);
 
     if !app.tg.is_owner(chat_id) {
-        app.tg.ack(cb_id, "Akses khusus owner.");
+        app.tg.ack(cb_id, "Owner access only.");
         return;
     }
 
@@ -1107,14 +1105,14 @@ fn handle_callback(app: &Arc<App>, cb: &Value) {
     } else if let Some(pct) = data.strip_prefix("set:") {
         match app.parse_pct(pct) {
             Ok(val) => {
-                app.tg.ack(cb_id, &format!("Konfirmasi {val}%"));
+                app.tg.ack(cb_id, &format!("Confirm {val}%"));
                 app.propose_budget(val, msg_id);
             }
             Err(err) => {
-                app.tg.ack(cb_id, "Nilai tidak valid");
+                app.tg.ack(cb_id, "Invalid value");
                 app.tg.present(
                     msg_id,
-                    &format!("**❌ Ditolak**\n\n{err}"),
+                    &format!("**❌ Rejected**\n\n{err}"),
                     Some(kb_budget()),
                 );
             }
@@ -1146,7 +1144,7 @@ fn handle_message(app: &Arc<App>, msg: &Value) {
     if cmd == "/setbudget" {
         if arg.is_empty() {
             app.tg.send(
-                "**❌ Ditolak**\n\nButuh angka. Contoh: `/setbudget 95`",
+                "**❌ Rejected**\n\nMissing percentage. Example: `/setbudget 95`",
                 Some(kb_budget()),
             );
             return;
@@ -1155,7 +1153,7 @@ fn handle_message(app: &Arc<App>, msg: &Value) {
             Ok(val) => app.propose_budget(val, None),
             Err(err) => {
                 app.tg
-                    .send(&format!("**❌ Ditolak**\n\n{err}"), Some(kb_budget()));
+                    .send(&format!("**❌ Rejected**\n\n{err}"), Some(kb_budget()));
             }
         }
     } else if let Some(sub) = cmd.strip_prefix('/') {
@@ -1201,27 +1199,27 @@ fn main() {
 
     let app = App::new(cfg);
     log_info(&format!(
-        "PX-Monitor v{VERSION} (Rust) mulai | inferhub={} | targets={}",
+        "PX-Monitor v{VERSION} (Rust) started | inferhub={} | targets={}",
         app.cfg.has_inferhub(),
         app.cfg.targets.len()
     ));
 
     app.tg.set_my_commands(&[
-        ("menu", "Dashboard monitor utama"),
-        ("status", "Akun & balance InferHub"),
-        ("usage", "Pemakaian 30 hari"),
-        ("today", "Pemakaian hari ini"),
-        ("breakdown", "Rincian per model"),
-        ("budget", "Budget default akun"),
-        ("setbudget", "Ubah diskon default"),
-        ("keys", "Daftar API key"),
-        ("targets", "Cek endpoint HTTP global"),
-        ("check", "Cek live sekarang"),
-        ("help", "Bantuan"),
+        ("menu", "Live monitor dashboard"),
+        ("status", "InferHub account & balance"),
+        ("usage", "30-day usage summary"),
+        ("today", "Today's usage"),
+        ("breakdown", "Per-model breakdown"),
+        ("budget", "Default account budget"),
+        ("setbudget", "Update default discount"),
+        ("keys", "Registered API keys"),
+        ("targets", "Probe global HTTP endpoints"),
+        ("check", "Run live check now"),
+        ("help", "Help & dashboard"),
     ]);
     app.tg.send(&app.dashboard_text(), Some(kb_main()));
 
-    // Background periodic checker (tidak memblokir long-polling Telegram)
+    // Non-blocking background periodic checker
     let bg = Arc::clone(&app);
     thread::spawn(move || loop {
         bg.periodic_check();
