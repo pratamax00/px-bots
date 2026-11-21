@@ -398,9 +398,10 @@ fn read_cpu_ticks() -> Option<(u64, u64)> {
 
 pub fn read_host_metrics() -> HostMetrics {
     let hostname = fs::read_to_string("/etc/hostname")
+        .ok()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
-        .unwrap_or_else(|_| "localhost".to_string());
+        .unwrap_or_else(|| "localhost".to_string());
 
     let uptime_secs = fs::read_to_string("/proc/uptime")
         .ok()
