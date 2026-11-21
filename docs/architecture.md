@@ -12,7 +12,8 @@
    - Primary cards use `Field | Value` GFM grids with key metrics highlighted (`==...==`).
    - Inline button navigation edits the existing message in-place (`editMessageText`) to avoid chat clutter.
    - Secondary information (full paths, guides, long breakdowns, error logs) sits below a `---` divider inside collapsible `<details><summary>...</summary>` blocks.
-   - Quick actions inside bubbles use native `<tg-button-row>` pills (`callback_data`, `url`, `copy_text`).
+   - **Hybrid Minimalis UI (Zero Duplicates):** contextual actions and clickable table rows live inside the bubble using styled `<tg-button>` (`primary`, `success`, `danger`, `link`, `url`, `copy_text`), while bottom `inline_keyboard` holds only a slim non-duplicate navigation bar.
+   - **Single Entry Command:** all bots register `/start` as the sole dashboard entry in `setMyCommands` (no duplicate `/menu` listing).
    - If rich rendering fails, `tg-core` automatically falls back to clean HTML (`parse_mode: "HTML"`).
 
 4. **Strict Configuration Hygiene**

@@ -20,7 +20,7 @@ Native Rust Telegram operator console for **Account-Factory (`af` CLI)** workflo
 
 | Command | Description |
 | :--- | :--- |
-| `/start`, `/menu` | Open PX-Abuse home dashboard |
+| `/start` | Open PX-Abuse home dashboard |
 | `/status` | Usable pool classification & proxy overview |
 | `/usable [full]` | Run `af usable scan` & report |
 | `/pool` | Inspect active provider pool & priorities |
