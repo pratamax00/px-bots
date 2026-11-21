@@ -1,0 +1,13 @@
+/target/
+/bin/
+/state/
+*.env
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+*.bak
+*.log
+*.sha256
+*.tmp
+.DS_Store
