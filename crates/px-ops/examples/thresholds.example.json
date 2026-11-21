@@ -1,0 +1,8 @@
+{
+  "intervalSeconds": 60,
+  "cooldownSeconds": 900,
+  "loadPerCpu": 1.5,
+  "ramPercent": 90,
+  "diskPercent": 90,
+  "temperatureC": 85
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "ops-config",
+    "label": "PX-Ops Config",
+    "paths": ["/path/to/px-ops/config"],
+    "retention": 7
+  },
+  {
+    "id": "router-data",
+    "label": "9Router Data",
+    "paths": ["/path/to/9router/data"],
+    "retention": 7
+  }
+]

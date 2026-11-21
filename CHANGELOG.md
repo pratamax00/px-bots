@@ -2,6 +2,15 @@
 
 All notable changes to **PX Bots** are documented in this file following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.0] - 2026-11-21
+
+### Added
+- **`px-ops`** crate (Phase 5 — Full 6-Bot Suite Complete!):
+  - Full Rust rewrite of the host operations & breakglass Telegram console on `tg-core` (100% English, Telegram-only, Bot API 10.3+ rich UI, in-place editing, `/start` registered first, ~3 MB RSS).
+  - Native Linux `/proc` + `/sys` dashboard with progress bars, heavy RAM-saver **Apps** 1-tap toggle (`systemd-user` / `systemd-system` / `docker`), paginated **Services** monitor & control with safe `systemd-run` self-restart, **Server** diagnostics & confirmed `apt` upgrade job, **9Router** health/lists/catalog sync with pure-Rust SHA-256 auth, **Agent Sessions** mode/compression/model control, **Backup** create/verify/restore with SHA-256 manifests & pre-restore checkpoints, confirmed **Reboot** & 2-stage **Shutdown**, background **Alert Monitor** with OPS Forum routing (`dm` / `ops` / `dual` + DM fallback), and `/exec` + `audit.jsonl`.
+  - Added sanitized config templates in `crates/px-ops/examples/` and documentation in `docs/bots/px-ops.md`.
+- **`tg-core`**: Added multi-surface `edit_in`, `present_in`, and `send_document_to` helpers to support Telegram forum group topics alongside owner DM.
+
 ## [0.4.0] - 2026-11-21
 
 ### Fixed

@@ -1,0 +1,14 @@
+{
+  "enabled": false,
+  "chatId": "",
+  "topics": {
+    "ops": null,
+    "alerts": null
+  },
+  "notify": {
+    "jobs": "dm",
+    "alerts": "dm"
+  },
+  "allowPrivate": true,
+  "requireOwner": true
+}

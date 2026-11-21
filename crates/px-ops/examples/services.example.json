@@ -1,0 +1,35 @@
+[
+  {
+    "id": "px-ops",
+    "label": "PX-Ops",
+    "manager": "systemd-user",
+    "unit": "px-ops.service",
+    "actions": ["status", "logs", "start", "stop", "restart"]
+  },
+  {
+    "id": "9router",
+    "label": "9Router",
+    "manager": "systemd-user",
+    "unit": "9router.service",
+    "actions": ["status", "logs", "start", "stop", "restart"]
+  },
+  {
+    "id": "jellyfin",
+    "label": "Jellyfin",
+    "manager": "systemd-system",
+    "unit": "jellyfin.service",
+    "actions": ["status", "logs", "start", "stop", "restart"],
+    "group": "apps",
+    "desc": "Media server"
+  },
+  {
+    "id": "immich",
+    "label": "Immich",
+    "manager": "docker",
+    "unit": "immich",
+    "containers": ["immich_server", "immich_postgres", "immich_redis"],
+    "actions": ["status", "logs", "start", "stop", "restart"],
+    "group": "apps",
+    "desc": "Photo & video library"
+  }
+]

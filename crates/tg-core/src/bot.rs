@@ -85,6 +85,18 @@ impl TgClient {
         content: &[u8],
         caption: Option<&str>,
     ) -> Result<Value, String> {
+        self.send_document_to(self.owner_id, None, filename, content, caption)
+    }
+
+    /// Uploads a UTF-8/binary document to any chat/topic via `sendDocument` multipart upload.
+    pub fn send_document_to(
+        &self,
+        chat_id: i64,
+        thread_id: Option<i64>,
+        filename: &str,
+        content: &[u8],
+        caption: Option<&str>,
+    ) -> Result<Value, String> {
         let ts = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_nanos())
@@ -109,11 +121,18 @@ impl TgClient {
         let mut body = Vec::with_capacity(content.len() + 512);
         body.extend_from_slice(
             format!(
-                "--{boundary}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{}\r\n",
-                self.owner_id
+                "--{boundary}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{chat_id}\r\n"
             )
             .as_bytes(),
         );
+        if let Some(tid) = thread_id.filter(|&t| t > 0) {
+            body.extend_from_slice(
+                format!(
+                    "--{boundary}\r\nContent-Disposition: form-data; name=\"message_thread_id\"\r\n\r\n{tid}\r\n"
+                )
+                .as_bytes(),
+            );
+        }
         if let Some(cap) = caption.filter(|s| !s.is_empty()) {
             body.extend_from_slice(
                 format!(
@@ -217,10 +236,22 @@ impl TgClient {
         }
     }
 
-    /// Edits an existing message in-place (`editMessageText` + `rich_message`, HTML fallback).
+    /// Edits an existing message in-place in the owner chat.
     pub fn edit(&self, message_id: i64, markdown: &str, keyboard: Option<Value>) -> Option<i64> {
+        self.edit_in(self.owner_id, None, message_id, markdown, keyboard)
+    }
+
+    /// Edits an existing message in-place in any chat/topic (`editMessageText` + `rich_message`, HTML fallback).
+    pub fn edit_in(
+        &self,
+        chat_id: i64,
+        thread_id: Option<i64>,
+        message_id: i64,
+        markdown: &str,
+        keyboard: Option<Value>,
+    ) -> Option<i64> {
         let mut payload = json!({
-            "chat_id": self.owner_id,
+            "chat_id": chat_id,
             "message_id": message_id,
             "rich_message": {"markdown": markdown},
             "disable_web_page_preview": true,
@@ -237,7 +268,7 @@ impl TgClient {
                 log_warn(&format!("editRich failed ({e}), falling back to HTML edit"));
                 let html = markdown_to_html(markdown);
                 let mut fb = json!({
-                    "chat_id": self.owner_id,
+                    "chat_id": chat_id,
                     "message_id": message_id,
                     "text": html,
                     "parse_mode": "HTML",
@@ -253,23 +284,35 @@ impl TgClient {
                             return Some(message_id);
                         }
                         log_warn(&format!("HTML edit failed ({e2}), sending new message"));
-                        self.send(markdown, keyboard)
+                        self.send_to(chat_id, thread_id, markdown, keyboard)
                     }
                 }
             }
         }
     }
 
-    /// Unified presentation helper: edits in-place when `message_id` is present, else sends new.
+    /// Unified presentation helper in owner chat: edits in-place when `message_id` is present, else sends new.
     pub fn present(
         &self,
         message_id: Option<i64>,
         markdown: &str,
         keyboard: Option<Value>,
     ) -> Option<i64> {
+        self.present_in(self.owner_id, None, message_id, markdown, keyboard)
+    }
+
+    /// Unified presentation helper in any chat/topic.
+    pub fn present_in(
+        &self,
+        chat_id: i64,
+        thread_id: Option<i64>,
+        message_id: Option<i64>,
+        markdown: &str,
+        keyboard: Option<Value>,
+    ) -> Option<i64> {
         match message_id {
-            Some(mid) => self.edit(mid, markdown, keyboard),
-            None => self.send(markdown, keyboard),
+            Some(mid) => self.edit_in(chat_id, thread_id, mid, markdown, keyboard),
+            None => self.send_to(chat_id, thread_id, markdown, keyboard),
         }
     }
 
