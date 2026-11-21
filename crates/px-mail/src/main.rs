@@ -19,7 +19,7 @@ use tg_core::bot::TgClient;
 use tg_core::state::{load_json, save_json_atomic};
 use tg_core::ui::{
     button, details_block, field_grid, hl, md_text, rows, stamp_wib, table_markdown, tg_button_row,
-    tg_cb_button, tg_copy_button, tg_url_button, truncate_str,
+    tg_cb_button, tg_cb_button_styled, tg_copy_button, tg_url_button, truncate_str,
 };
 use tg_core::{log_error, log_info, log_warn};
 
@@ -455,10 +455,10 @@ impl App {
         ]);
 
         let pills = tg_button_row(&[
-            tg_cb_button("➕ Create", "create:start"),
-            tg_cb_button("⚡ Bulk", "gen:start"),
-            tg_cb_button("📧 Emails", "mail:list"),
-            tg_cb_button("📥 Inbox", "inbox:pick"),
+            tg_cb_button_styled("➕ Create", "create:start", "success"),
+            tg_cb_button_styled("⚡ Bulk", "gen:start", "primary"),
+            tg_cb_button_styled("🔄 Sync D1", "sync:force", "primary"),
+            tg_cb_button_styled("🔄 Refresh", "menu:home", "primary"),
         ]);
 
         let dom_list = self
@@ -472,7 +472,7 @@ impl App {
         let cmds = table_markdown(
             &["Command", "Description"],
             &[
-                vec!["`/start` · `/menu`".into(), "Mail dashboard".into()],
+                vec!["`/start`".into(), "Mail dashboard".into()],
                 vec!["`/create`".into(), "Create a new address".into()],
                 vec!["`/generate`".into(), format!("Bulk create (up to {BULK_MAX})")],
                 vec!["`/emails`".into(), "Manage saved addresses".into()],
@@ -868,19 +868,46 @@ impl App {
             Some(RETENTION_PERMANENT) => "Permanent",
             _ => "All",
         };
+        let ret_key = retention_filter.unwrap_or("all");
+        let list_prefix = if for_inbox { "inbox" } else { "mail" };
+
         let rows_data: Vec<Vec<String>> = if slice.is_empty() {
             vec![vec!["_No mailboxes found_".into(), "—".into()]]
         } else {
             slice
                 .iter()
                 .map(|m| {
+                    let r = mailbox_ref(&m.address);
+                    let cb = if for_inbox {
+                        format!("inbox:open:{r}:0")
+                    } else {
+                        format!("mail:pick:{r}")
+                    };
                     vec![
-                        format!("`{}`", truncate_str(&m.address, 30)),
+                        tg_cb_button_styled(&truncate_str(&m.address, 30), &cb, "link"),
                         retention_label(&m.retention).to_string(),
                     ]
                 })
                 .collect()
         };
+
+        let filter_pills = tg_button_row(&[
+            tg_cb_button_styled(
+                "All",
+                &format!("{list_prefix}:pg:all:0"),
+                if retention_filter.is_none() { "success" } else { "primary" },
+            ),
+            tg_cb_button_styled(
+                "⏱ 24h",
+                &format!("{list_prefix}:pg:24h:0"),
+                if retention_filter == Some(RETENTION_24H) { "success" } else { "primary" },
+            ),
+            tg_cb_button_styled(
+                "♾ Perm",
+                &format!("{list_prefix}:pg:permanent:0"),
+                if retention_filter == Some(RETENTION_PERMANENT) { "success" } else { "primary" },
+            ),
+        ]);
 
         let card = [
             format!(
@@ -892,44 +919,13 @@ impl App {
             String::new(),
             table_markdown(&["Address", "Retention"], &rows_data),
             String::new(),
+            filter_pills,
+            String::new(),
             format!("_{}_", stamp_wib()),
         ]
         .join("\n");
 
-        let ret_key = retention_filter.unwrap_or("all");
-        let list_prefix = if for_inbox { "inbox" } else { "mail" };
-
-        let mut kb_rows: Vec<Value> = slice
-            .iter()
-            .map(|m| {
-                let r = mailbox_ref(&m.address);
-                let cb = if for_inbox {
-                    format!("inbox:open:{r}:0")
-                } else {
-                    format!("mail:pick:{r}")
-                };
-                json!([button(&truncate_str(&m.address, 38), &cb, "primary")])
-            })
-            .collect();
-
-        // Filter row
-        kb_rows.push(json!([
-            button(
-                "All",
-                &format!("{list_prefix}:pg:all:0"),
-                if retention_filter.is_none() { "success" } else { "primary" }
-            ),
-            button(
-                "⏱ 24h",
-                &format!("{list_prefix}:pg:24h:0"),
-                if retention_filter == Some(RETENTION_24H) { "success" } else { "primary" }
-            ),
-            button(
-                "♾ Perm",
-                &format!("{list_prefix}:pg:permanent:0"),
-                if retention_filter == Some(RETENTION_PERMANENT) { "success" } else { "primary" }
-            ),
-        ]));
+        let mut kb_rows: Vec<Value> = Vec::new();
 
         let mut nav = Vec::new();
         if p > 0 {
@@ -974,7 +970,8 @@ impl App {
         let mref = mailbox_ref(&box_row.address);
         let pills = tg_button_row(&[
             tg_copy_button("📋 Copy Address", &box_row.address),
-            tg_cb_button("📥 Open Inbox", &format!("inbox:open:{mref}:0")),
+            tg_cb_button_styled("📥 Open Inbox", &format!("inbox:open:{mref}:0"), "primary"),
+            tg_cb_button_styled("🗑 Delete", &format!("mail:del:{mref}"), "danger"),
         ]);
         let mut pairs = vec![
             ("Address", format!("`{}`", box_row.address)),
@@ -1003,16 +1000,10 @@ impl App {
         ]
         .join("\n");
         let kb = json!({
-            "inline_keyboard": [
-                [
-                    button("📥 Open Inbox", &format!("inbox:open:{mref}:0"), "primary"),
-                    button("🗑 Delete", &format!("mail:del:{mref}"), "danger"),
-                ],
-                [
-                    button("← My Emails", "mail:list", "primary"),
-                    button("🏠 Dashboard", "menu:home", "primary"),
-                ],
-            ]
+            "inline_keyboard": [[
+                button("← My Emails", "mail:list", "primary"),
+                button("🏠 Dashboard", "menu:home", "primary"),
+            ]]
         });
         self.tg.present(msg_id, &card, Some(kb));
     }
@@ -1386,14 +1377,10 @@ impl App {
 // ── keyboards & errors ──────────────────────────────────────────────────────
 fn kb_main() -> Value {
     json!({
-        "inline_keyboard": rows(vec![
-            button("➕ Create Email", "create:start", "success"),
-            button("⚡ Bulk Generate", "gen:start", "primary"),
+        "inline_keyboard": [[
             button("📧 My Emails", "mail:list", "primary"),
             button("📥 Inbox", "inbox:pick", "primary"),
-            button("🔄 Sync D1", "sync:force", "primary"),
-            button("🏠 Refresh", "menu:home", ""),
-        ])
+        ]]
     })
 }
 
@@ -1648,7 +1635,6 @@ fn main() {
 
     app.tg.set_my_commands(&[
         ("start", "Open dashboard"),
-        ("menu", "Mail dashboard"),
         ("create", "Create a new email address"),
         ("generate", "Bulk generate addresses"),
         ("emails", "Manage saved emails"),

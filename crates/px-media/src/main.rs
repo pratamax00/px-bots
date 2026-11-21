@@ -16,7 +16,7 @@ use tg_core::bot::TgClient;
 use tg_core::state::{load_json, save_json_atomic};
 use tg_core::ui::{
     button, details_block, field_grid, format_duration, hl, human_bytes, progress_bar, stamp_wib,
-    table_markdown, tail_str, tg_button_row, tg_cb_button, tg_copy_button, tg_url_button,
+    table_markdown, tail_str, tg_button_row, tg_cb_button_styled, tg_copy_button, tg_url_button,
     truncate_str,
 };
 use tg_core::{log_error, log_info, log_warn};
@@ -153,29 +153,12 @@ impl App {
     }
 
     fn kb_menu(&self) -> Value {
-        let active = { self.state.lock().unwrap().folder.clone() };
-        let style_for = |k: &str| {
-            if active.as_deref() == Some(k) {
-                "success"
-            } else {
-                "primary"
-            }
-        };
         json!({
-            "inline_keyboard": [
-                [
-                    button(target_label("films"), "pick:films", style_for("films")),
-                    button(target_label("series"), "pick:series", style_for("series")),
-                ],
-                [
-                    button(target_label("anime"), "pick:anime", style_for("anime")),
-                    button("🕒 Recent", "act:recent", "primary"),
-                ],
-                [
-                    button("📡 Scan Jellyfin", "act:scan", "primary"),
-                    button("🔗 Access Links", "act:links", "primary"),
-                ],
-            ]
+            "inline_keyboard": [[
+                button("🕒 Recent", "act:recent", "primary"),
+                button("📡 Scan", "act:scan", "primary"),
+                button("🔗 Links", "act:links", "primary"),
+            ]]
         })
     }
 
@@ -228,13 +211,19 @@ impl App {
             ("Jellyfin", jf_val),
         ]);
 
+        let style_for = |k: &str| {
+            if active_folder.as_deref() == Some(k) {
+                "success"
+            } else {
+                "primary"
+            }
+        };
         let mut pills = vec![
-            tg_cb_button("🔄 Refresh", "act:menu"),
-            tg_cb_button("🕒 Recent", "act:recent"),
+            tg_cb_button_styled(target_label("films"), "pick:films", style_for("films")),
+            tg_cb_button_styled(target_label("series"), "pick:series", style_for("series")),
+            tg_cb_button_styled(target_label("anime"), "pick:anime", style_for("anime")),
+            tg_cb_button_styled("🔄 Refresh", "act:menu", "primary"),
         ];
-        if jf_up {
-            pills.push(tg_cb_button("📡 Scan", "act:scan"));
-        }
         if !self.cfg.link_filebrowser.is_empty() {
             pills.push(tg_url_button("📂 Files", &self.cfg.link_filebrowser));
         }
@@ -1395,7 +1384,6 @@ fn main() {
     log_info(&format!("PX-Media v{VERSION} (Rust) started"));
     app.tg.set_my_commands(&[
         ("start", "Open dashboard"),
-        ("menu", "Dashboard & target folder"),
         ("recent", "Recent files in active folder"),
         ("links", "Media service access links"),
         ("scan", "Trigger Jellyfin library scan"),

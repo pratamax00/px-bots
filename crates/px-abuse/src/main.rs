@@ -21,7 +21,7 @@ use tg_core::bot::TgClient;
 use tg_core::state::{load_json, save_json_atomic};
 use tg_core::ui::{
     button, details_block, field_grid, format_duration, hl, md_text, progress_bar, rows,
-    stamp_wib, table_markdown, tail_str, tg_button_row, tg_cb_button, truncate_str,
+    stamp_wib, table_markdown, tail_str, tg_button_row, tg_cb_button_styled, truncate_str,
 };
 use tg_core::{log_error, log_info, log_warn};
 
@@ -376,16 +376,19 @@ impl App {
     // ── keyboards ───────────────────────────────────────────────────────────
     fn kb_home() -> Value {
         json!({
-            "inline_keyboard": rows(vec![
-                button("⚡ Generate", "nav:generate", "success"),
-                button("📚 Playbooks", "nav:playbooks", "primary"),
-                button("📊 Pool / Usable", "nav:pool", "primary"),
-                button("📥 Import / CPA", "nav:import", "primary"),
-                button("🌐 Proxy", "nav:proxy", "primary"),
-                button("📋 Jobs", "nav:jobs", "primary"),
-                button("⚙️ Settings", "nav:settings", "primary"),
-                button("❓ Help", "cmd:help", ""),
-            ])
+            "inline_keyboard": [
+                [
+                    button("📚 Playbooks", "nav:playbooks", "primary"),
+                    button("📊 Pool", "nav:pool", "primary"),
+                    button("📥 Import", "nav:import", "primary"),
+                ],
+                [
+                    button("🌐 Proxy", "nav:proxy", "primary"),
+                    button("📋 Jobs", "nav:jobs", "primary"),
+                    button("⚙️ Settings", "nav:settings", "primary"),
+                ],
+                [button("❓ Help", "cmd:help", "")],
+            ]
         })
     }
 
@@ -544,8 +547,9 @@ impl App {
             (st.settings.clone(), self.jobs.running_count())
         };
         let pills = tg_button_row(&[
-            tg_cb_button("📊 Quick Status", "cmd:status"),
-            tg_cb_button("🔄 Refresh", "nav:home"),
+            tg_cb_button_styled("⚡ Generate", "nav:generate", "success"),
+            tg_cb_button_styled("📊 Status", "cmd:status", "primary"),
+            tg_cb_button_styled("🔄 Refresh", "nav:home", "primary"),
         ]);
         let run_badge = if running > 0 {
             hl(&format!("⏳ {running} active"))
@@ -1043,7 +1047,11 @@ impl App {
                 .take(10)
                 .map(|j| {
                     vec![
-                        format!("{} `{}`", job_icon(&j.status), j.id),
+                        tg_cb_button_styled(
+                            &format!("{} {}", job_icon(&j.status), j.id),
+                            &format!("jobopen:{}", j.id),
+                            "link",
+                        ),
                         j.status.clone(),
                         truncate_str(&j.label, 28),
                     ]
@@ -1051,20 +1059,10 @@ impl App {
                 .collect();
             table_markdown(&["Job", "Status", "Label"], &trows)
         };
-        let top_btns: Vec<Value> = jobs
-            .iter()
-            .take(6)
-            .map(|j| button(&format!("{} {}", job_icon(&j.status), j.id), &format!("jobopen:{}", j.id), ""))
-            .collect();
-        let mut kb_rows = if top_btns.is_empty() {
-            Vec::new()
-        } else {
-            rows(top_btns).as_array().cloned().unwrap_or_default()
-        };
-        kb_rows.push(json!([
+        let kb_rows = vec![json!([
             button("🔄 Refresh", "nav:jobs", "primary"),
             button("🏠 Home", "nav:home", "primary"),
-        ]));
+        ])];
 
         let md = format!(
             "**📋 Background Jobs**\n\n{}\n\n{}\n\nTap a job below to view its log, or use `/job <id>` · `/stop <id>`.\n_Updated: {}_",
@@ -3695,7 +3693,6 @@ fn main() {
 
     app.tg.set_my_commands(&[
         ("start", "Open PX-Abuse dashboard"),
-        ("menu", "Home dashboard"),
         ("status", "Usable pool & proxy overview"),
         ("usable", "Scan usable accounts & report"),
         ("pool", "Inspect pool & priority order"),

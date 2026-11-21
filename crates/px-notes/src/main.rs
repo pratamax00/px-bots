@@ -13,7 +13,7 @@ use tg_core::bot::TgClient;
 use tg_core::state::{load_json, save_json_atomic};
 use tg_core::ui::{
     button, details_block, field_grid, format_epoch_wib, hl, human_bytes, md_text, stamp_wib,
-    table_markdown, tg_button_row, tg_cb_button, tg_copy_button, tg_url_button, truncate_str,
+    table_markdown, tg_button_row, tg_cb_button_styled, tg_copy_button, tg_url_button, truncate_str,
 };
 use tg_core::{log_error, log_info, log_warn};
 use vault::{link_category_label, NotesVault, LINK_CATEGORIES};
@@ -150,10 +150,10 @@ impl App {
         ]);
 
         let pills = tg_button_row(&[
-            tg_cb_button("📁 Notes", "notes:page:0"),
-            tg_cb_button("🔎 Search", "search:start"),
-            tg_cb_button("➕ Note", "note:start"),
-            tg_cb_button("🔗 Link", "link:start"),
+            tg_cb_button_styled("➕ New Note", "note:start", "success"),
+            tg_cb_button_styled("➕ Add Link", "link:start", "success"),
+            tg_cb_button_styled("🔎 Search", "search:start", "primary"),
+            tg_cb_button_styled("🔄 Refresh", "menu:home", "primary"),
         ]);
 
         let recent_table = if recent.is_empty() {
@@ -169,7 +169,7 @@ impl App {
         let cmds = table_markdown(
             &["Command", "Description"],
             &[
-                vec!["`/menu`".into(), "Vault dashboard".into()],
+                vec!["`/start`".into(), "Vault dashboard".into()],
                 vec!["`/notes`".into(), "Browse Markdown notes".into()],
                 vec!["`/links`".into(), "Browse saved links".into()],
                 vec!["`/search <q>`".into(), "Full-text & path search".into()],
@@ -215,9 +215,20 @@ impl App {
         } else {
             slice
                 .iter()
-                .map(|f| vec![format!("`{}`", truncate_str(&f.path, 34)), human_bytes(f.size)])
+                .map(|f| {
+                    let r = self.issue_ref(&f.path);
+                    vec![
+                        tg_cb_button_styled(&truncate_str(&f.path, 34), &format!("file:open:{r}"), "link"),
+                        human_bytes(f.size),
+                    ]
+                })
                 .collect()
         };
+
+        let pills = tg_button_row(&[
+            tg_cb_button_styled("➕ New Note", "note:start", "success"),
+            tg_cb_button_styled("🔎 Search", "search:start", "primary"),
+        ]);
 
         let card = [
             format!(
@@ -228,18 +239,13 @@ impl App {
             String::new(),
             table_markdown(&["Path", "Size"], &table_rows),
             String::new(),
+            pills,
+            String::new(),
             format!("_{}_", stamp_wib()),
         ]
         .join("\n");
 
-        let mut kb_rows: Vec<Value> = slice
-            .iter()
-            .map(|f| {
-                let r = self.issue_ref(&f.path);
-                json!([button(&format!("📄 {}", truncate_str(&f.path, 36)), &format!("file:open:{r}"), "primary")])
-            })
-            .collect();
-
+        let mut kb_rows: Vec<Value> = Vec::new();
         let mut nav = Vec::new();
         if p > 0 {
             nav.push(button(&format!("← Page {p}"), &format!("notes:page:{}", p - 1), "primary"));
@@ -254,11 +260,7 @@ impl App {
         if !nav.is_empty() {
             kb_rows.push(Value::Array(nav));
         }
-        kb_rows.push(json!([
-            button("➕ New Note", "note:start", "success"),
-            button("🔎 Search", "search:start", "primary"),
-        ]));
-        kb_rows.push(json!([button("📁 Dashboard", "menu:home", "primary")]));
+        kb_rows.push(json!([button("🏠 Dashboard", "menu:home", "primary")]));
 
         self.tg
             .present(msg_id, &card, Some(json!({"inline_keyboard": kb_rows})));
@@ -365,8 +367,8 @@ impl App {
 
                 let pills = tg_button_row(&[
                     tg_copy_button("📋 Copy Path", &file.path),
-                    tg_cb_button("✏️ Append", &format!("file:append:{r}")),
-                    tg_cb_button("🔄 Reload", &format!("file:open:{r}")),
+                    tg_cb_button_styled("✏️ Append", &format!("file:append:{r}"), "success"),
+                    tg_cb_button_styled("🔄 Reload", &format!("file:open:{r}"), "primary"),
                 ]);
 
                 let card = [
@@ -383,16 +385,10 @@ impl App {
                 .join("\n");
 
                 let kb = json!({
-                    "inline_keyboard": [
-                        [
-                            button("✏️ Append Text", &format!("file:append:{r}"), "success"),
-                            button("🔄 Reload", &format!("file:open:{r}"), "primary"),
-                        ],
-                        [
-                            button("📁 Notes", "notes:page:0", "primary"),
-                            button("🏠 Dashboard", "menu:home", "primary"),
-                        ],
-                    ]
+                    "inline_keyboard": [[
+                        button("📁 Notes", "notes:page:0", "primary"),
+                        button("🏠 Dashboard", "menu:home", "primary"),
+                    ]]
                 });
                 self.tg.present(msg_id, &card, Some(kb));
             }
@@ -661,20 +657,10 @@ impl App {
 // ── keyboards & cards ───────────────────────────────────────────────────────
 fn kb_main() -> Value {
     json!({
-        "inline_keyboard": [
-            [
-                button("📁 Notes", "notes:page:0", "primary"),
-                button("🔗 Bookmarks", "links:all", "primary"),
-            ],
-            [
-                button("➕ New Note", "note:start", "success"),
-                button("🔎 Search", "search:start", "primary"),
-            ],
-            [
-                button("➕ Add Link", "link:start", "success"),
-                button("🔄 Refresh", "menu:home", ""),
-            ],
-        ]
+        "inline_keyboard": [[
+            button("📁 Notes", "notes:page:0", "primary"),
+            button("🔗 Bookmarks", "links:all", "primary"),
+        ]]
     })
 }
 
@@ -939,7 +925,6 @@ fn main() {
 
     app.tg.set_my_commands(&[
         ("start", "Open dashboard"),
-        ("menu", "Vault dashboard"),
         ("notes", "Browse Markdown notes"),
         ("links", "Browse saved bookmarks"),
         ("search", "Search paths and contents"),

@@ -11,7 +11,7 @@ use tg_core::http::build_api_agent;
 use tg_core::state::{load_json, save_json_atomic};
 use tg_core::ui::{
     button, details_block, field_grid, format_int, hl, progress_bar, rows, stamp_wib,
-    table_markdown, tg_button_row, tg_cb_button, truncate_str,
+    table_markdown, tg_button_row, tg_cb_button, tg_cb_button_styled, truncate_str,
 };
 use tg_core::{log_error, log_info, log_warn};
 
@@ -298,10 +298,10 @@ impl App {
         ]);
 
         let pills = tg_button_row(&[
-            tg_cb_button("🔄 Refresh", "cmd:menu"),
-            tg_cb_button("📊 Status", "cmd:status"),
-            tg_cb_button("📈 Usage", "cmd:usage"),
-            tg_cb_button("🌐 Targets", "cmd:targets"),
+            tg_cb_button_styled("🔄 Check All", "cmd:menu", "success"),
+            tg_cb_button_styled("📊 Status", "cmd:status", "primary"),
+            tg_cb_button_styled("📈 Usage", "cmd:usage", "primary"),
+            tg_cb_button_styled("🌐 Targets", "cmd:targets", "primary"),
         ]);
 
         let guide = table_markdown(
@@ -935,14 +935,10 @@ fn error_card(title: &str, err: &str) -> String {
 fn kb_main() -> Value {
     json!({
         "inline_keyboard": rows(vec![
-            button("📊 Status", "cmd:status", "primary"),
-            button("📈 Usage", "cmd:usage", "primary"),
             button("📅 Today", "cmd:today", "primary"),
             button("📋 Breakdown", "cmd:breakdown", "primary"),
             button("💰 Budget", "cmd:budget", "primary"),
             button("🔑 Keys", "cmd:keys", "primary"),
-            button("🌐 Targets", "cmd:targets", "primary"),
-            button("🔄 Check All", "cmd:menu", "success"),
         ])
     })
 }
@@ -950,8 +946,7 @@ fn kb_main() -> Value {
 fn kb_back() -> Value {
     json!({
         "inline_keyboard": [[
-            button("📁 Dashboard", "cmd:menu", "primary"),
-            button("🔄 Status", "cmd:status", ""),
+            button("🏠 Dashboard", "cmd:menu", "primary"),
         ]]
     })
 }
@@ -1214,7 +1209,6 @@ fn main() {
 
     app.tg.set_my_commands(&[
         ("start", "Open dashboard"),
-        ("menu", "Live monitor dashboard"),
         ("status", "InferHub account & balance"),
         ("usage", "30-day usage summary"),
         ("today", "Today's usage"),
