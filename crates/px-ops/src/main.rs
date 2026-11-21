@@ -756,34 +756,27 @@ impl App {
 
     // ── Server Panel ────────────────────────────────────────────────────────
     fn render_server_menu(&self, surf: Surface, msg_id: Option<i64>) {
+        let row1 = tg_button_row(&[
+            tg_cb_button_styled("ℹ️ Info", "srv:info", "primary"),
+            tg_cb_button_styled("💽 Storage", "srv:storage", "primary"),
+            tg_cb_button_styled("🌐 Network", "srv:network", "primary"),
+            tg_cb_button_styled("📈 Processes", "srv:processes", "primary"),
+        ]);
+        let row2 = tg_button_row(&[
+            tg_cb_button_styled("📦 Check Updates", "srv:updates", "primary"),
+            tg_cb_button_styled("🩺 SMART Disk", "srv:smart", "primary"),
+            tg_cb_button_styled("⬆ Apply Updates", "srv:apply_update", "danger"),
+        ]);
         let md = format!(
-            "**🖥 Host Server Operations**\n\n{}\n\nChoose a host inspection or maintenance action.",
+            "**🖥 Host Server Operations**\n\n{}\n\n{}\n\n{}",
             field_grid(&[
                 ("Read-Only", "Info · Storage · Network · Processes · Updates · SMART".into()),
                 ("Mutation", "Apply Updates (confirmed background job)".into()),
-            ])
+            ]),
+            row1,
+            row2,
         );
-        let kb = json!({
-            "inline_keyboard": [
-                [
-                    button("ℹ️ System Info", "srv:info", "primary"),
-                    button("💽 Storage", "srv:storage", "primary"),
-                ],
-                [
-                    button("🌐 Network", "srv:network", "primary"),
-                    button("📈 Processes", "srv:processes", "primary"),
-                ],
-                [
-                    button("📦 Check Updates", "srv:updates", "primary"),
-                    button("🩺 SMART Disk", "srv:smart", "primary"),
-                ],
-                [
-                    button("⬆ Apply Updates", "srv:apply_update", "danger"),
-                    button("🏠 Home", "menu:dashboard", "primary"),
-                ],
-            ]
-        });
-        self.deliver(surf, msg_id, "server", &md, kb);
+        self.deliver(surf, msg_id, "server", &md, Self::kb_back_home(vec![]));
     }
 
     fn exec_server_cmd(&self, surf: Surface, msg_id: Option<i64>, sub: &str) {
@@ -992,8 +985,20 @@ impl App {
 
     // ── 9Router Panel ───────────────────────────────────────────────────────
     fn render_router_menu(&self, surf: Surface, msg_id: Option<i64>) {
+        let row1 = tg_button_row(&[
+            tg_cb_button_styled("💚 Quick Health", "rtr:health", "success"),
+            tg_cb_button_styled("🩺 Full Health", "rtr:health_full", "primary"),
+            tg_cb_button_styled("🔄 Refresh Catalog", "rtr:refresh", "success"),
+        ]);
+        let row2 = tg_button_row(&[
+            tg_cb_button_styled("🧩 Providers", "rtr:list:providers", "primary"),
+            tg_cb_button_styled("📦 Models", "rtr:list:models", "primary"),
+            tg_cb_button_styled("🔌 Nodes", "rtr:list:nodes", "primary"),
+            tg_cb_button_styled("🔑 Keys", "rtr:list:keys", "link"),
+            tg_cb_button_styled("🔀 Combos", "rtr:list:combos", "link"),
+        ]);
         let md = format!(
-            "**🌐 9Router Control**\n\n{}\n\nSelect a health check, catalog sync, or resource list.",
+            "**🌐 9Router Control**\n\n{}\n\n{}\n\n{}",
             field_grid(&[
                 ("Endpoint", format!("`{}`", md_text(&self.cfg.router_base_url))),
                 (
@@ -1004,30 +1009,11 @@ impl App {
                         "Not configured".into()
                     }
                 ),
-            ])
+            ]),
+            row1,
+            row2,
         );
-        let kb = json!({
-            "inline_keyboard": [
-                [
-                    button("💚 Quick Health", "rtr:health", "success"),
-                    button("🩺 Full Health", "rtr:health_full", "primary"),
-                ],
-                [
-                    button("🔄 Refresh Catalog", "rtr:refresh", "success"),
-                    button("🧩 Providers", "rtr:list:providers", "primary"),
-                ],
-                [
-                    button("📦 Models", "rtr:list:models", "primary"),
-                    button("🔌 Nodes", "rtr:list:nodes", "primary"),
-                ],
-                [
-                    button("🔑 API Keys", "rtr:list:keys", ""),
-                    button("🔀 Combos", "rtr:list:combos", ""),
-                ],
-                [button("🏠 Home", "menu:dashboard", "primary")],
-            ]
-        });
-        self.deliver(surf, msg_id, "router", &md, kb);
+        self.deliver(surf, msg_id, "router", &md, Self::kb_back_home(vec![]));
     }
 
     fn exec_router(&self, surf: Surface, msg_id: Option<i64>, sub: &str) {
@@ -1199,39 +1185,29 @@ impl App {
         let trows: Vec<Vec<String>> = list
             .iter()
             .take(14)
-            .map(|s| {
+            .enumerate()
+            .map(|(idx, s)| {
                 vec![
-                    s.label.clone(),
+                    tg_cb_button_styled(&s.label, &format!("ses:open:{idx}"), "link"),
                     s.mode.clone(),
                     truncate_str(&s.model, 22),
                 ]
             })
             .collect();
-        let sbtns: Vec<Value> = list
-            .iter()
-            .take(10)
-            .enumerate()
-            .map(|(idx, s)| {
-                let st = match s.mode.as_str() {
-                    "fullpower" => "danger",
-                    "hemat" => "success",
-                    _ => "",
-                };
-                button(&s.label, &format!("ses:open:{idx}"), st)
-            })
-            .collect();
-        let mut kb_rows = rows(sbtns).as_array().cloned().unwrap_or_default();
-        kb_rows.push(json!([
-            button("⚡ Bulk Santai", "ses:bulk:santai", "primary"),
-            button("🌿 Bulk Hemat", "ses:bulk:hemat", "success"),
-        ]));
-        kb_rows.push(json!([
-            button("🔥 Bulk Fullpower", "ses:bulk:fullpower", "danger"),
-            button("🏠 Home", "menu:dashboard", "primary"),
-        ]));
+        let bulk_pills = tg_button_row(&[
+            tg_cb_button_styled("⚡ Bulk Santai", "ses:bulk:santai", "primary"),
+            tg_cb_button_styled("🌿 Bulk Hemat", "ses:bulk:hemat", "success"),
+            tg_cb_button_styled("🔥 Bulk Fullpower", "ses:bulk:fullpower", "danger"),
+        ]);
+        let kb = json!({
+            "inline_keyboard": [[
+                button("🔄 Refresh", "menu:sessions", "primary"),
+                button("🏠 Home", "menu:dashboard", "primary"),
+            ]]
+        });
 
         let md = format!(
-            "**🧠 Agent Sessions**\n\n{}\n\n{}\n\nTap a session to configure mode, compression, or model override.\n_Updated: {}_",
+            "**🧠 Agent Sessions**\n\n{}\n\n{}\n\n{}\n\nTap a session in the table to configure mode or model.\n_Updated: {}_",
             field_grid(&[
                 ("Total Sessions", list.len().to_string()),
                 ("Fullpower / Hemat", format!("{fp} / {he}")),
@@ -1241,9 +1217,10 @@ impl App {
             } else {
                 table_markdown(&["Session", "Mode", "Model"], &trows)
             },
+            bulk_pills,
             stamp_wib()
         );
-        self.deliver(surf, msg_id, "sessions", &md, json!({"inline_keyboard": kb_rows}));
+        self.deliver(surf, msg_id, "sessions", &md, kb);
     }
 
     fn render_session_detail(&self, surf: Surface, msg_id: Option<i64>, idx: usize) {
@@ -1264,39 +1241,39 @@ impl App {
             .compress_pct
             .map(|v| format!("{}% (override)", (v * 100.0).round() as i32))
             .unwrap_or_else(|| "preset".to_string());
+        let mode_pills = tg_button_row(&[
+            tg_cb_button_styled("😌 Santai", &format!("ses:mode:{idx}:santai"), if item.mode == "santai" { "primary" } else { "" }),
+            tg_cb_button_styled("🌿 Hemat", &format!("ses:mode:{idx}:hemat"), if item.mode == "hemat" { "success" } else { "" }),
+            tg_cb_button_styled("🔥 Fullpower", &format!("ses:mode:{idx}:fullpower"), if item.mode == "fullpower" { "danger" } else { "" }),
+        ]);
+        let model_pills = tg_button_row(&[
+            tg_cb_button_styled("🤖 Pick Model", &format!("ses:models:{idx}"), "primary"),
+            tg_cb_button_styled("🧹 Clear Model", &format!("ses:clearmod:{idx}"), "danger"),
+        ]);
+        let comp_pills = tg_button_row(&[
+            tg_cb_button_styled("🗜 10%", &format!("ses:comp:{idx}:10"), ""),
+            tg_cb_button_styled("🗜 25%", &format!("ses:comp:{idx}:25"), ""),
+            tg_cb_button_styled("🗜 50%", &format!("ses:comp:{idx}:50"), ""),
+            tg_cb_button_styled("🧹 Reset Comp", &format!("ses:comp:{idx}:0"), "danger"),
+        ]);
         let md = format!(
-            "**🧠 Session · {}**\n\n{}\n\n_Mode & model updates apply on the next turn (no restart required)._",
+            "**🧠 Session · {}**\n\n{}\n\n{}\n\n{}\n\n{}\n\n_Mode & model updates apply on the next turn (no restart required)._",
             md_text(&item.label),
             field_grid(&[
                 ("Key", format!("`{}`", md_text(&item.key))),
                 ("Mode", hl(&item.mode)),
                 ("Model Override", format!("`{}`", md_text(&item.model))),
                 ("Compression", comp_str),
-            ])
+            ]),
+            mode_pills,
+            model_pills,
+            comp_pills,
         );
         let kb = json!({
-            "inline_keyboard": [
-                [
-                    button("😌 Santai", &format!("ses:mode:{idx}:santai"), if item.mode == "santai" { "primary" } else { "" }),
-                    button("🌿 Hemat", &format!("ses:mode:{idx}:hemat"), if item.mode == "hemat" { "success" } else { "" }),
-                ],
-                [
-                    button("🔥 Fullpower", &format!("ses:mode:{idx}:fullpower"), if item.mode == "fullpower" { "danger" } else { "" }),
-                    button("🤖 Pick Model", &format!("ses:models:{idx}"), "primary"),
-                ],
-                [
-                    button("🗜 10%", &format!("ses:comp:{idx}:10"), ""),
-                    button("🗜 25%", &format!("ses:comp:{idx}:25"), ""),
-                ],
-                [
-                    button("🗜 50%", &format!("ses:comp:{idx}:50"), ""),
-                    button("🧹 Reset Comp", &format!("ses:comp:{idx}:0"), "danger"),
-                ],
-                [
-                    button("🧹 Clear Model", &format!("ses:clearmod:{idx}"), "danger"),
-                    button("↩ Sessions", "menu:sessions", "primary"),
-                ],
-            ]
+            "inline_keyboard": [[
+                button("↩ Sessions", "menu:sessions", "primary"),
+                button("🏠 Home", "menu:dashboard", "primary"),
+            ]]
         });
         self.deliver(surf, msg_id, "session-detail", &md, kb);
     }
@@ -1316,48 +1293,54 @@ impl App {
             st.model_choices = models.clone();
             self.persist(&st);
         }
-        let btns: Vec<Value> = models
-            .iter()
-            .enumerate()
-            .map(|(mi, m)| button(&truncate_str(m, 26), &format!("ses:setmod:{idx}:{mi}"), "primary"))
-            .collect();
-        let mut kb_rows = rows(btns).as_array().cloned().unwrap_or_default();
-        kb_rows.push(json!([
-            button("🧹 Clear Model", &format!("ses:clearmod:{idx}"), "danger"),
-            button("↩ Back", &format!("ses:open:{idx}"), "primary"),
-        ]));
+        let list_md = if models.is_empty() {
+            "_No models returned by 9Router `/v1/models`._".to_string()
+        } else {
+            let mrows: Vec<Vec<String>> = models
+                .iter()
+                .enumerate()
+                .map(|(mi, m)| {
+                    vec![
+                        format!("#{}", mi + 1),
+                        tg_cb_button_styled(&truncate_str(m, 34), &format!("ses:setmod:{idx}:{mi}"), "link"),
+                    ]
+                })
+                .collect();
+            table_markdown(&["#", "Model"], &mrows)
+        };
+        let clear_pill = tg_button_row(&[tg_cb_button_styled(
+            "🧹 Clear Model Override",
+            &format!("ses:clearmod:{idx}"),
+            "danger",
+        )]);
         let md = format!(
-            "**🤖 Select Model Override**\n\n{}",
-            if models.is_empty() {
-                "_No models returned by 9Router `/v1/models`._"
-            } else {
-                "Choose a model from 9Router below:"
-            }
+            "**🤖 Select Model Override**\n\n{list_md}\n\n{clear_pill}"
         );
-        self.deliver(surf, msg_id, "model-picker", &md, json!({"inline_keyboard": kb_rows}));
+        let kb = json!({
+            "inline_keyboard": [[
+                button("↩ Back", &format!("ses:open:{idx}"), "primary"),
+                button("🏠 Home", "menu:dashboard", "primary"),
+            ]]
+        });
+        self.deliver(surf, msg_id, "model-picker", &md, kb);
     }
 
     // ── Tools Panel ─────────────────────────────────────────────────────────
     fn render_tools_menu(&self, surf: Surface, msg_id: Option<i64>) {
-        let md = "**🛠 Diagnostics & Operator Tools**\n\nInspect PX-Ops self-health, Hermes CLI, host diagnostics, and audit history.";
-        let kb = json!({
-            "inline_keyboard": [
-                [
-                    button("🩺 Self-Check", "tool:selfcheck", "success"),
-                    button("📜 Recent Audit", "tool:audit", "primary"),
-                ],
-                [
-                    button("📦 Hermes Version", "tool:hver", "primary"),
-                    button("🧪 Hermes Doctor", "tool:hdoc", "primary"),
-                ],
-                [
-                    button("👥 Profiles & GW", "tool:hprof", "primary"),
-                    button("🗂 Diagnostics Bundle", "tool:diag", "primary"),
-                ],
-                [button("🏠 Home", "menu:dashboard", "primary")],
-            ]
-        });
-        self.deliver(surf, msg_id, "tools", md, kb);
+        let row1 = tg_button_row(&[
+            tg_cb_button_styled("🩺 Self-Check", "tool:selfcheck", "success"),
+            tg_cb_button_styled("📜 Recent Audit", "tool:audit", "primary"),
+            tg_cb_button_styled("🗂 Diagnostics", "tool:diag", "primary"),
+        ]);
+        let row2 = tg_button_row(&[
+            tg_cb_button_styled("📦 Hermes Ver", "tool:hver", "primary"),
+            tg_cb_button_styled("🧪 Hermes Doctor", "tool:hdoc", "primary"),
+            tg_cb_button_styled("👥 Profiles & GW", "tool:hprof", "primary"),
+        ]);
+        let md = format!(
+            "**🛠 Diagnostics & Operator Tools**\n\nInspect PX-Ops self-health, Hermes CLI, host diagnostics, and audit history.\n\n{row1}\n\n{row2}"
+        );
+        self.deliver(surf, msg_id, "tools", &md, Self::kb_back_home(vec![]));
     }
 
     fn exec_tool(&self, surf: Surface, msg_id: Option<i64>, sub: &str) {
@@ -1690,23 +1673,19 @@ impl App {
     }
 
     fn render_power(&self, surf: Surface, msg_id: Option<i64>) {
+        let pills = tg_button_row(&[
+            tg_cb_button_styled("🔄 Reboot Host", "pwr:reboot", "danger"),
+            tg_cb_button_styled("⏹ Shutdown Host", "pwr:shutdown", "danger"),
+        ]);
         let md = format!(
-            "**⚡ Host Power Control**\n\n{}\n\n⚠️ Reboot requires confirmation; Shutdown requires **2-stage confirmation**.",
+            "**⚡ Host Power Control**\n\n{}\n\n{}\n\n⚠️ Reboot requires confirmation; Shutdown requires **2-stage confirmation**.",
             field_grid(&[
                 ("Reboot", "`sudo -n systemctl reboot` · back in ~60s".into()),
                 ("Shutdown", "`sudo -n systemctl poweroff` · requires physical power-on".into()),
-            ])
+            ]),
+            pills,
         );
-        let kb = json!({
-            "inline_keyboard": [
-                [
-                    button("🔄 Reboot Host", "pwr:reboot", "danger"),
-                    button("⏹ Shutdown Host", "pwr:shutdown", "danger"),
-                ],
-                [button("🏠 Home", "menu:dashboard", "primary")],
-            ]
-        });
-        self.deliver(surf, msg_id, "power", &md, kb);
+        self.deliver(surf, msg_id, "power", &md, Self::kb_back_home(vec![]));
     }
 
     fn render_settings(&self, surf: Surface, msg_id: Option<i64>) {
@@ -1716,8 +1695,16 @@ impl App {
             let st = self.state.lock().unwrap();
             (st.maintenance, st.cooldowns.len(), st.manual_off.len())
         };
+        let pills = tg_button_row(&[
+            tg_cb_button_styled(
+                if maint { "✅ Disable Maintenance" } else { "⚠️ Enable Maintenance" },
+                "set:maint",
+                if maint { "success" } else { "danger" },
+            ),
+            tg_cb_button_styled("🧹 Clear Cooldowns", "set:clear_cd", "primary"),
+        ]);
         let md = format!(
-            "**⚙️ PX-Ops Settings**\n\n{}\n\n_Thresholds and routing are loaded live from `OPS_CONFIG_DIR`._",
+            "**⚙️ PX-Ops Settings**\n\n{}\n\n{}\n\n_Thresholds and routing are loaded live from `OPS_CONFIG_DIR`._",
             field_grid(&[
                 ("Maintenance", if maint { hl("⚠️ Active (alerts paused)") } else { "✅ Off".into() }),
                 ("Alert Interval", format!("{}s · cooldown {}s", th.interval_seconds, th.cooldown_seconds)),
@@ -1725,22 +1712,10 @@ impl App {
                 ("OPS Forum", if forum.enabled { format!("Enabled (alerts: {}, jobs: {})", forum.notify.alerts, forum.notify.jobs) } else { "Disabled (DM only)".into() }),
                 ("Active Cooldowns", cd_n.to_string()),
                 ("Manual-Off Units", man_n.to_string()),
-            ])
+            ]),
+            pills,
         );
-        let kb = json!({
-            "inline_keyboard": [
-                [
-                    button(
-                        if maint { "✅ Disable Maintenance" } else { "⚠️ Enable Maintenance" },
-                        "set:maint",
-                        if maint { "success" } else { "danger" }
-                    ),
-                    button("🧹 Clear Cooldowns", "set:clear_cd", "primary"),
-                ],
-                [button("🏠 Home", "menu:dashboard", "primary")],
-            ]
-        });
-        self.deliver(surf, msg_id, "settings", &md, kb);
+        self.deliver(surf, msg_id, "settings", &md, Self::kb_back_home(vec![]));
     }
 
     fn render_help(&self, surf: Surface, msg_id: Option<i64>) {

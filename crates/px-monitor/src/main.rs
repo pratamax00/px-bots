@@ -11,7 +11,7 @@ use tg_core::http::build_api_agent;
 use tg_core::state::{load_json, save_json_atomic};
 use tg_core::ui::{
     button, details_block, field_grid, format_int, hl, progress_bar, rows, stamp_wib,
-    table_markdown, tg_button_row, tg_cb_button, tg_cb_button_styled, truncate_str,
+    table_markdown, tg_button_row, tg_cb_button_styled, truncate_str,
 };
 use tg_core::{log_error, log_info, log_warn};
 
@@ -378,9 +378,8 @@ impl App {
         };
 
         let pills = tg_button_row(&[
-            tg_cb_button("🔄 Refresh", "cmd:status"),
-            tg_cb_button("📈 Usage", "cmd:usage"),
-            tg_cb_button("📁 Menu", "cmd:menu"),
+            tg_cb_button_styled("🔄 Refresh", "cmd:status", "primary"),
+            tg_cb_button_styled("📈 Usage", "cmd:usage", "primary"),
         ]);
 
         Ok([
@@ -447,9 +446,8 @@ impl App {
         ]);
 
         let pills = tg_button_row(&[
-            tg_cb_button("🔄 Refresh", "cmd:usage"),
-            tg_cb_button("📅 Today", "cmd:today"),
-            tg_cb_button("📁 Menu", "cmd:menu"),
+            tg_cb_button_styled("🔄 Refresh", "cmd:usage", "primary"),
+            tg_cb_button_styled("📅 Today", "cmd:today", "primary"),
         ]);
 
         Ok([
@@ -509,9 +507,8 @@ impl App {
             truncate_str(d.get("to").and_then(Value::as_str).unwrap_or("—"), 16).replace('T', " ");
 
         let pills = tg_button_row(&[
-            tg_cb_button("🔄 Refresh", "cmd:today"),
-            tg_cb_button("📋 Breakdown", "cmd:breakdown"),
-            tg_cb_button("📁 Menu", "cmd:menu"),
+            tg_cb_button_styled("🔄 Refresh", "cmd:today", "primary"),
+            tg_cb_button_styled("📋 Breakdown", "cmd:breakdown", "primary"),
         ]);
 
         Ok([
@@ -564,9 +561,8 @@ impl App {
         };
 
         let pills = tg_button_row(&[
-            tg_cb_button("🔄 Refresh", "cmd:breakdown"),
-            tg_cb_button("📈 Usage", "cmd:usage"),
-            tg_cb_button("📁 Menu", "cmd:menu"),
+            tg_cb_button_styled("🔄 Refresh", "cmd:breakdown", "primary"),
+            tg_cb_button_styled("📈 Usage", "cmd:usage", "primary"),
         ]);
 
         Ok([
@@ -633,12 +629,23 @@ impl App {
             "✅ All models covered by the default budget.".to_string()
         };
 
+        let preset_pills = tg_button_row(&[
+            tg_cb_button_styled("95%", "set:95.00", "primary"),
+            tg_cb_button_styled("90%", "set:90.00", "primary"),
+            tg_cb_button_styled("85%", "set:85.00", "primary"),
+            tg_cb_button_styled("98%", "set:98.00", ""),
+            tg_cb_button_styled("99%", "set:99.00", ""),
+        ]);
+
         Ok([
             format!("**💰 PX-Monitor · Default Budget** · {}", hl("InferHub")),
             String::new(),
             grid,
             String::new(),
             warn_line,
+            String::new(),
+            preset_pills,
+            String::new(),
             format!("_{}_", stamp_wib()),
         ]
         .join("\n"))
@@ -678,8 +685,7 @@ impl App {
         };
 
         let pills = tg_button_row(&[
-            tg_cb_button("🔄 Refresh", "cmd:keys"),
-            tg_cb_button("📁 Menu", "cmd:menu"),
+            tg_cb_button_styled("🔄 Refresh", "cmd:keys", "primary"),
         ]);
 
         Ok([
@@ -735,8 +741,7 @@ impl App {
         }
 
         let pills = tg_button_row(&[
-            tg_cb_button("🔄 Re-probe", "cmd:targets"),
-            tg_cb_button("📁 Menu", "cmd:menu"),
+            tg_cb_button_styled("🔄 Re-probe", "cmd:targets", "primary"),
         ]);
 
         [
@@ -953,18 +958,7 @@ fn kb_back() -> Value {
 
 fn kb_budget() -> Value {
     json!({
-        "inline_keyboard": [
-            [
-                button("95%", "set:95.00", "primary"),
-                button("90%", "set:90.00", "primary"),
-                button("85%", "set:85.00", "primary"),
-            ],
-            [
-                button("98%", "set:98.00", ""),
-                button("99%", "set:99.00", ""),
-            ],
-            [button("📁 Dashboard", "cmd:menu", "primary")],
-        ]
+        "inline_keyboard": [[button("🏠 Dashboard", "cmd:menu", "primary")]]
     })
 }
 
