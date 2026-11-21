@@ -39,7 +39,7 @@ jobs:
       - name: Package & inspect release assets
         run: |
           mkdir -p dist
-          for bin in px-media px-monitor px-notes px-mail; do
+          for bin in px-media px-monitor px-notes px-mail px-abuse; do
             src="target/x86_64-unknown-linux-musl/release/${bin}"
             dst="dist/${bin}-linux-x86_64"
             cp "$src" "$dst"

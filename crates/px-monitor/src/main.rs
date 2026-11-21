@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use tg_core::bot::TgClient;
-use tg_core::http::build_agent;
+use tg_core::http::build_api_agent;
 use tg_core::state::{load_json, save_json_atomic};
 use tg_core::ui::{
     button, details_block, field_grid, format_int, hl, progress_bar, rows, stamp_wib,
@@ -153,7 +153,7 @@ struct App {
 impl App {
     fn new(cfg: Config) -> Arc<Self> {
         let tg = TgClient::new(cfg.tg_token.clone(), cfg.owner_id);
-        let http = build_agent(10, 25);
+        let http = build_api_agent(20);
         let initial_state: BotState = load_json(&cfg.state_file);
         Arc::new(Self {
             cfg,
@@ -179,6 +179,7 @@ impl App {
             .set("Authorization", &format!("Bearer {}", self.cfg.inferhub_key))
             .set("Accept", "application/json")
             .set("User-Agent", UA)
+            .set("Connection", "close")
             .call()
         {
             Ok(r) => r,
@@ -207,6 +208,7 @@ impl App {
             .set("Accept", "application/json")
             .set("Content-Type", "application/json")
             .set("User-Agent", UA)
+            .set("Connection", "close")
             .send_json(payload)
         {
             Ok(r) => r,
@@ -225,7 +227,13 @@ impl App {
 
     fn probe_target(&self, t: &HttpTarget) -> (bool, String, u128) {
         let t0 = Instant::now();
-        match self.http.get(&t.url).set("User-Agent", UA).call() {
+        match self
+            .http
+            .get(&t.url)
+            .set("User-Agent", UA)
+            .set("Connection", "close")
+            .call()
+        {
             Ok(r) => {
                 let code = r.status();
                 let ms = t0.elapsed().as_millis();

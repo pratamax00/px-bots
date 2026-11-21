@@ -12,11 +12,11 @@ A Rust Cargo Workspace monorepo of ultra-lightweight, owner-only Telegram operat
 
 | Binary | Status | Purpose | Docs |
 | :--- | :--- | :--- | :--- |
-| **`px-media`** | ✅ Active (`v0.3.0`) | Google Drive (`gdrive-dl`) & Pixeldrain media library downloader + Jellyfin scan | [docs/bots/px-media.md](docs/bots/px-media.md) |
-| **`px-monitor`** | ✅ Active (`v0.3.0`) | InferHub balance/usage/budget monitor + modular global HTTP target probes | [docs/bots/px-monitor.md](docs/bots/px-monitor.md) |
-| **`px-notes`** | ✅ Active (`v0.3.0`) | Local Markdown notes vault, bookmark browser, append editor, and full-text search | [docs/bots/px-notes.md](docs/bots/px-notes.md) |
-| **`px-mail`** | ✅ Active (`v0.3.0`) | Ephemeral & permanent TempMail operator with Cloudflare D1 sync, OTP & link pills | [docs/bots/px-mail.md](docs/bots/px-mail.md) |
-| **`px-abuse`** | 🔜 Phase 4 | Account-factory operator, playbooks, jobs, and audit log | — |
+| **`px-media`** | ✅ Active (`v0.4.0`) | Google Drive (`gdrive-dl`) & Pixeldrain media library downloader + Jellyfin scan | [docs/bots/px-media.md](docs/bots/px-media.md) |
+| **`px-monitor`** | ✅ Active (`v0.4.0`) | InferHub balance/usage/budget monitor + modular global HTTP target probes | [docs/bots/px-monitor.md](docs/bots/px-monitor.md) |
+| **`px-notes`** | ✅ Active (`v0.4.0`) | Local Markdown notes vault, bookmark browser, append editor, and full-text search | [docs/bots/px-notes.md](docs/bots/px-notes.md) |
+| **`px-mail`** | ✅ Active (`v0.4.0`) | Ephemeral & permanent TempMail operator with Cloudflare D1 sync, OTP & link pills | [docs/bots/px-mail.md](docs/bots/px-mail.md) |
+| **`px-abuse`** | ✅ Active (`v0.4.0`) | Account-factory operator, playbooks, pending CPA import, reprio, jobs, and audit log | [docs/bots/px-abuse.md](docs/bots/px-abuse.md) |
 | **`px-ops`** | 🔜 Phase 5 | Breakglass host operations, service control, apps toggle, and alerts | — |
 
 ## Quick Deploy

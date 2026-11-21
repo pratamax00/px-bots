@@ -1,15 +1,22 @@
-use crate::http::build_agent;
+use crate::http::{build_agent, build_api_agent};
 use crate::ui::markdown_to_html;
 use crate::{log_error, log_warn};
 use serde_json::{json, Value};
 use std::sync::Arc;
 use std::thread;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Canonical Telegram Bot API 10.3+ client (rich-first, in-place edit, non-blocking ack).
+///
+/// Uses two dedicated HTTP agents:
+/// - `poll_agent`: keeps 1 warm connection for `getUpdates` (active every 25s, never NAT-idle).
+/// - `api_agent`: disables idle pooling (`max_idle_connections(0)`) with a hard 20s deadline so
+///   interactive sends/edits/acks after long idle windows never stall on dropped NAT sockets.
 pub struct TgClient {
     token: String,
     owner_id: i64,
-    agent: ureq::Agent,
+    poll_agent: ureq::Agent,
+    api_agent: ureq::Agent,
 }
 
 impl TgClient {
@@ -17,7 +24,8 @@ impl TgClient {
         Arc::new(Self {
             token,
             owner_id,
-            agent: build_agent(10, 45),
+            poll_agent: build_agent(10, 35),
+            api_agent: build_api_agent(20),
         })
     }
 
@@ -30,18 +38,18 @@ impl TgClient {
     }
 
     pub fn agent(&self) -> &ureq::Agent {
-        &self.agent
+        &self.api_agent
     }
 
-    /// Raw Bot API POST request.
-    pub fn call(&self, method: &str, payload: Value) -> Result<Value, String> {
+    fn call_with(&self, agent: &ureq::Agent, close_conn: bool, method: &str, payload: Value) -> Result<Value, String> {
         let url = format!("https://api.telegram.org/bot{}/{method}", self.token);
-        let resp = match self
-            .agent
+        let mut req = agent
             .post(&url)
-            .set("Content-Type", "application/json")
-            .send_json(payload)
-        {
+            .set("Content-Type", "application/json");
+        if close_conn {
+            req = req.set("Connection", "close");
+        }
+        let resp = match req.send_json(payload) {
             Ok(r) => r,
             Err(ureq::Error::Status(code, r)) => {
                 let body = r.into_string().unwrap_or_default();
@@ -60,6 +68,98 @@ impl TgClient {
                 .get("description")
                 .and_then(Value::as_str)
                 .unwrap_or("Telegram API error");
+            return Err(desc.to_string());
+        }
+        Ok(parsed)
+    }
+
+    /// Raw Bot API POST request using the short-lived interactive API agent.
+    pub fn call(&self, method: &str, payload: Value) -> Result<Value, String> {
+        self.call_with(&self.api_agent, true, method, payload)
+    }
+
+    /// Uploads a UTF-8/binary document to the owner chat via `sendDocument` multipart upload.
+    pub fn send_document(
+        &self,
+        filename: &str,
+        content: &[u8],
+        caption: Option<&str>,
+    ) -> Result<Value, String> {
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let boundary = format!("----PxBotsBoundary{ts}");
+        let safe_name: String = filename
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_') {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        let safe_name = if safe_name.is_empty() {
+            "output.txt".to_string()
+        } else {
+            safe_name
+        };
+
+        let mut body = Vec::with_capacity(content.len() + 512);
+        body.extend_from_slice(
+            format!(
+                "--{boundary}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{}\r\n",
+                self.owner_id
+            )
+            .as_bytes(),
+        );
+        if let Some(cap) = caption.filter(|s| !s.is_empty()) {
+            body.extend_from_slice(
+                format!(
+                    "--{boundary}\r\nContent-Disposition: form-data; name=\"caption\"\r\n\r\n{cap}\r\n"
+                )
+                .as_bytes(),
+            );
+        }
+        body.extend_from_slice(
+            format!(
+                "--{boundary}\r\nContent-Disposition: form-data; name=\"document\"; filename=\"{safe_name}\"\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n"
+            )
+            .as_bytes(),
+        );
+        body.extend_from_slice(content);
+        body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+
+        let url = format!("https://api.telegram.org/bot{}/sendDocument", self.token);
+        let resp = match self
+            .api_agent
+            .post(&url)
+            .set(
+                "Content-Type",
+                &format!("multipart/form-data; boundary={boundary}"),
+            )
+            .set("Connection", "close")
+            .send_bytes(&body)
+        {
+            Ok(r) => r,
+            Err(ureq::Error::Status(code, r)) => {
+                let raw = r.into_string().unwrap_or_default();
+                return Err(format!("HTTP {code}: {raw}"));
+            }
+            Err(e) => return Err(format!("{e}")),
+        };
+        let text = resp.into_string().map_err(|e| format!("{e}"))?;
+        if text.is_empty() {
+            return Ok(json!({}));
+        }
+        let parsed: Value =
+            serde_json::from_str(&text).map_err(|e| format!("JSON decode failed: {e}"))?;
+        if parsed.get("ok").and_then(Value::as_bool) == Some(false) {
+            let desc = parsed
+                .get("description")
+                .and_then(Value::as_str)
+                .unwrap_or("Telegram sendDocument error");
             return Err(desc.to_string());
         }
         Ok(parsed)
@@ -199,7 +299,9 @@ impl TgClient {
 
     /// Long-polling `getUpdates` (default 25s timeout stays below NAT idle drop).
     pub fn get_updates(&self, offset: i64, timeout_secs: u64) -> Result<Vec<Value>, String> {
-        let data = self.call(
+        let data = self.call_with(
+            &self.poll_agent,
+            false,
             "getUpdates",
             json!({
                 "offset": offset,

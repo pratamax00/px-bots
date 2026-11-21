@@ -1,5 +1,5 @@
 use serde_json::{json, Value};
-use tg_core::http::build_agent;
+use tg_core::http::build_api_agent;
 use tg_core::ui::truncate_str;
 
 #[derive(Debug, Clone)]
@@ -26,7 +26,7 @@ impl MailApi {
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
             admin_token,
-            agent: build_agent(10, 30),
+            agent: build_api_agent(15),
         }
     }
 
@@ -42,7 +42,8 @@ impl MailApi {
         let mut req = self
             .agent
             .request(method, &url)
-            .set("User-Agent", "PX-Mail/0.3");
+            .set("User-Agent", "PX-Mail/0.4")
+            .set("Connection", "close");
         if admin {
             req = req.set("x-admin-auth", &self.admin_token);
         }

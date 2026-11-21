@@ -59,14 +59,10 @@ impl Config {
             .parse::<i64>()
             .map_err(|e| format!("Invalid OWNER_ID: {e}"))?;
         let api_base = env::var("MAIL_API_BASE")
-            .or_else(|_| env::var("VTEMPMAIL_API_BASE"))
             .map_err(|_| "MAIL_API_BASE environment variable is required".to_string())?;
         let admin_token = env::var("MAIL_ADMIN_TOKEN")
-            .or_else(|_| env::var("VTEMPMAIL_ADMIN_TOKEN"))
             .map_err(|_| "MAIL_ADMIN_TOKEN environment variable is required".to_string())?;
-        let domains_raw = env::var("MAIL_DOMAINS")
-            .or_else(|_| env::var("VTEMPMAIL_MAIL_DOMAIN"))
-            .unwrap_or_default();
+        let domains_raw = env::var("MAIL_DOMAINS").unwrap_or_default();
         let domains: Vec<String> = domains_raw
             .split(',')
             .map(|d| d.trim().to_ascii_lowercase())
@@ -339,7 +335,8 @@ impl App {
                         }
                     }
                 }
-                Err(_) => {
+                Err(e) => {
+                    log_warn(&format!("sync_d1 probe failed: {e}"));
                     summary.reachable = false;
                     *self.sync_meta.lock().unwrap() = (Some(Instant::now()), Some(summary.clone()));
                     return summary;

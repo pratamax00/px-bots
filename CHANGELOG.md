@@ -2,6 +2,21 @@
 
 All notable changes to **PX Bots** are documented in this file following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-11-21
+
+### Fixed
+- **`tg-core` HTTP zero-hang hardening (fixes `px-mail` & `px-monitor` Cloudflare keep-alive stalls):**
+  - Added explicit `.timeout_write(...)` and hard wall-clock `.timeout(...)` to `build_agent`, and introduced `build_api_agent(timeout_secs)` with `max_idle_connections(0)` so bursty API requests never reuse half-open sockets silently dropped by NAT or edge proxies during idle periods.
+  - Split `TgClient` into dedicated `poll_agent` (continuous `getUpdates`) and `api_agent` (non-pooled interactive `send`/`edit`/`ack`/`sendDocument`) plus `Connection: close` on external API calls.
+  - Switched `px-mail` (`MailApi`) and `px-monitor` (InferHub & target probes) to `build_api_agent`, logged `sync_d1` probe failures cleanly, and removed legacy env fallback keys from `px-mail`.
+
+### Added
+- **`px-abuse`** crate (Phase 4):
+  - Full Rust rewrite of the Account-Factory (`af` CLI) Telegram operator console on `tg-core` (100% English, Telegram-only, Bot API 10.3+ rich UI, in-place editing, `/start` registered first).
+  - Interactive multi-step Generate wizard (`Provider → Mode → Params → Preview → Confirmation Gate`), Operator Playbooks (`Quick Smoke`, `Fill Stock`, `Post-Generate`, `Cleanup Stock`), background job manager with 5-second live in-place progress updates & `SIGTERM` stop, honest `zero_pass` outcome surfacing, pure-Rust Pending CPA scanner with multi-select & batch import (max 5), pure-Rust router priority reorder (`Reprio`), archive/delete batch workflow, and `sendDocument` long-output delivery.
+  - Added crate documentation in `docs/bots/px-abuse.md` and registered `px-abuse` in `.github/workflows/release.yml`.
+- Added `TgClient::send_document` multipart file upload helper to `tg-core`.
+
 ## [0.3.0] - 2026-11-21
 
 ### Added
