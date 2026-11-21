@@ -1,0 +1,11 @@
+[package]
+name = "px-notes"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "PX-Notes — lightweight Telegram Markdown vault manager, link bookmarker, and fast full-text search"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tg-core = { path = "../tg-core" }

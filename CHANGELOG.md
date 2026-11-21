@@ -2,6 +2,14 @@
 
 All notable changes to **PX Bots** are documented in this file following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-11-21
+
+### Added
+- **`px-notes`** crate (Phase 2):
+  - Full Rust rewrite of the local Markdown notes vault bot on top of `tg-core` (100% English, Telegram-only, Bot API 10.3+ rich UI, in-place editing).
+  - Paginated vault browser (`/notes`), note reader (`/open`) with metadata grid & native `Copy Path` pill, in-place **Append Text** wizard, strict path-jailed **New Note** wizard (`/new`), full-text & path **Search** (`/search`) with UTF-8 safe snippets, and **Bookmarks** browser (`/links`) + **Add Link** wizard (`/link`) compatible with existing `links/<category>.md` files.
+  - Added crate documentation in `docs/bots/px-notes.md` and registered `px-notes` in the musl GitHub Actions release pipeline.
+
 ## [0.1.1] - 2026-11-21
 
 ### Changed
