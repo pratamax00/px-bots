@@ -12,12 +12,12 @@ A Rust Cargo Workspace monorepo of ultra-lightweight, owner-only Telegram operat
 
 | Binary | Status | Purpose | Docs |
 | :--- | :--- | :--- | :--- |
-| **`px-media`** | ✅ Active (`v1.2.0`) | Google Drive (`gdrive-dl`) & Pixeldrain media library downloader + Jellyfin scan | [docs/bots/px-media.md](docs/bots/px-media.md) |
-| **`px-monitor`** | ✅ Active (`v1.2.0`) | InferHub balance/usage/budget monitor + modular global HTTP target probes | [docs/bots/px-monitor.md](docs/bots/px-monitor.md) |
-| **`px-notes`** | ✅ Active (`v1.2.0`) | Local Markdown notes vault, bookmark browser, append editor, and full-text search | [docs/bots/px-notes.md](docs/bots/px-notes.md) |
-| **`px-mail`** | ✅ Active (`v1.2.0`) | Ephemeral & permanent TempMail operator with Cloudflare D1 sync, OTP & link pills | [docs/bots/px-mail.md](docs/bots/px-mail.md) |
-| **`px-abuse`** | ✅ Active (`v1.2.0`) | Account-factory operator, playbooks, pending CPA import, reprio, jobs, and audit log | [docs/bots/px-abuse.md](docs/bots/px-abuse.md) |
-| **`px-ops`** | ✅ Active (`v1.2.0`) | Host operations & breakglass console, apps toggle, services, backup, 9Router, alerts | [docs/bots/px-ops.md](docs/bots/px-ops.md) |
+| **`px-media`** | ✅ Active (`v1.2.2`) | Google Drive (`gdrive-dl`) & Pixeldrain media library downloader + Jellyfin scan | [docs/bots/px-media.md](docs/bots/px-media.md) |
+| **`px-monitor`** | ✅ Active (`v1.2.2`) | InferHub balance/usage/budget monitor + modular global HTTP target probes | [docs/bots/px-monitor.md](docs/bots/px-monitor.md) |
+| **`px-notes`** | ✅ Active (`v1.2.2`) | Local Markdown notes vault, bookmark browser, append editor, and full-text search | [docs/bots/px-notes.md](docs/bots/px-notes.md) |
+| **`px-mail`** | ✅ Active (`v1.2.2`) | Ephemeral & permanent TempMail operator with Cloudflare D1 sync, OTP & link pills | [docs/bots/px-mail.md](docs/bots/px-mail.md) |
+| **`px-abuse`** | ✅ Active (`v1.2.2`) | Account-factory operator, playbooks, pending CPA import, reprio, jobs, and audit log | [docs/bots/px-abuse.md](docs/bots/px-abuse.md) |
+| **`px-ops`** | ✅ Active (`v1.2.2`) | Host operations & breakglass console, apps toggle, services, backup, 9Router, alerts | [docs/bots/px-ops.md](docs/bots/px-ops.md) |
 
 ## Quick Deploy
 

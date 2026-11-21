@@ -612,36 +612,24 @@ impl App {
             self.persist(&st);
         }
         let ready_n = PROVIDERS.iter().filter(|p| p.ready).count();
-        let list_md: String = PROVIDERS
+        let pills: Vec<String> = PROVIDERS
             .iter()
             .map(|p| {
                 if p.ready {
-                    format!("- **{}** — {}", p.label, hl("ready"))
+                    tg_cb_button_styled(&format!("⚡ {}", p.label), &format!("prov:generate:{}", p.id), "success")
                 } else {
-                    format!("- {} — _Coming soon_", p.label)
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-        let btns: Vec<Value> = PROVIDERS
-            .iter()
-            .map(|p| {
-                if p.ready {
-                    button(&format!("⚡ {}", p.label), &format!("prov:generate:{}", p.id), "success")
-                } else {
-                    button(&format!("{} · Soon", p.label), &format!("provsoon:{}", p.id), "")
+                    tg_cb_button_styled(&format!("{} · Soon", p.label), &format!("provsoon:{}", p.id), "link")
                 }
             })
             .collect();
-        let mut kb_rows = rows(btns).as_array().cloned().unwrap_or_default();
-        kb_rows.extend(Self::kb_nav_footer(vec![]));
+        let kb_rows = Self::kb_nav_footer(vec![]);
         let md = format!(
-            "**⚡ Generate · Select Provider**\n\n{}\n\n{}\n\nChoose a provider below.",
+            "**⚡ Generate · Select Provider**\n\n{}\n\n{}\n\nSelect a provider above.",
             field_grid(&[
                 ("Flow", "Provider → Mode → Params → Preview".into()),
                 ("Ready Providers", ready_n.to_string()),
             ]),
-            list_md
+            tg_button_row(&pills),
         );
         self.tg
             .present(msg_id, &md, Some(json!({"inline_keyboard": kb_rows})));
@@ -898,30 +886,30 @@ impl App {
             self.persist(&st);
             st.settings.clone()
         };
+        let row1 = tg_button_row(&[
+            tg_cb_button_styled("🧪 Quick Smoke", "pb:quick_smoke", "primary"),
+            tg_cb_button_styled("📦 Fill Stock", "pb:fill_stock", "success"),
+        ]);
+        let row2 = tg_button_row(&[
+            tg_cb_button_styled("➡ Post-Generate", "pb:post_generate", "primary"),
+            tg_cb_button_styled("🧹 Cleanup Stock", "pb:cleanup", "danger"),
+        ]);
         let md = format!(
-            "**📚 Operator Playbooks**\n\n{}\n\n- **Quick Smoke** — Fast 1-round verification using default smoke target\n- **Fill Stock** — Standard batch run (auto-import OFF)\n- **Post-Generate** — Scan pending CPA files + usable audit + 1-tap/batch import\n- **Cleanup Stock** — Preview quota/denied archive + priority reorder plan",
+            "**📚 Operator Playbooks**\n\n{}\n\n{}\n\n{}\n\n- **Quick Smoke** — Fast 1-round verification\n- **Fill Stock** — Standard batch run (auto-import OFF)\n- **Post-Generate** — Pending CPA + usable audit + import\n- **Cleanup Stock** — Archive quota/denied + reprio",
             field_grid(&[
                 ("Default Provider", hl(&settings.default_provider)),
                 ("Smoke Target", settings.default_target_smoke.to_string()),
                 ("Batch Target", settings.default_target_batch.to_string()),
                 ("Default Workers", settings.default_workers.to_string()),
-            ])
+            ]),
+            row1,
+            row2,
         );
         let kb = json!({
-            "inline_keyboard": [
-                [
-                    button("🧪 Quick Smoke", "pb:quick_smoke", "primary"),
-                    button("📦 Fill Stock", "pb:fill_stock", "success"),
-                ],
-                [
-                    button("➡ Post-Generate", "pb:post_generate", "primary"),
-                    button("🧹 Cleanup Stock", "pb:cleanup", "danger"),
-                ],
-                [
-                    button("🏠 Home", "nav:home", "primary"),
-                    button("⚡ Generate", "nav:generate", "success"),
-                ],
-            ]
+            "inline_keyboard": [[
+                button("🏠 Home", "nav:home", "primary"),
+                button("⚡ Generate", "nav:generate", "success"),
+            ]]
         });
         self.tg.present(msg_id, &md, Some(kb));
     }
@@ -933,30 +921,28 @@ impl App {
             st.session.awaiting = None;
             self.persist(&st);
         }
-        let mut kb_rows = vec![
-            json!([
-                button("📊 Status Overview", "cmd:status", "primary"),
-                button("📋 Pool List", "cmd:pool", "primary"),
-            ]),
-            json!([
-                button("✅ Usable Scan", "cmd:usable", "success"),
-                button("↕ Reprio Plan", "cmd:ops_reprio", "primary"),
-            ]),
-            json!([
-                button("🗄 Archive Quick", "cmd:archive_quick", "danger"),
-                button("🧹 Cleanup Playbook", "pb:cleanup", "danger"),
-            ]),
-        ];
-        kb_rows.extend(Self::kb_nav_footer(vec![]));
+        let row1 = tg_button_row(&[
+            tg_cb_button_styled("📊 Status", "cmd:status", "primary"),
+            tg_cb_button_styled("📋 Pool List", "cmd:pool", "primary"),
+            tg_cb_button_styled("✅ Usable Scan", "cmd:usable", "success"),
+        ]);
+        let row2 = tg_button_row(&[
+            tg_cb_button_styled("↕ Reprio Plan", "cmd:ops_reprio", "primary"),
+            tg_cb_button_styled("🗄 Archive Quick", "cmd:archive_quick", "danger"),
+            tg_cb_button_styled("🧹 Cleanup", "pb:cleanup", "danger"),
+        ]);
+        let kb_rows = Self::kb_nav_footer(vec![]);
         let md = format!(
-            "**📊 Pool & Usable Health**\n\n{}\n\nSelect an inspection or maintenance action.",
+            "**📊 Pool & Usable Health**\n\n{}\n\n{}\n\n{}",
             field_grid(&[
                 ("Status", "Usable pool classification + proxy summary".into()),
                 ("Pool List", "Inspect active connections & priority order".into()),
                 ("Usable Scan", "Run fresh `af usable scan` & report".into()),
                 ("Reprio", "Rank fresh/transient first, quota/denied last".into()),
                 ("Archive Quick", "Preview or archive quota + denied accounts".into()),
-            ])
+            ]),
+            row1,
+            row2,
         );
         self.tg
             .present(msg_id, &md, Some(json!({"inline_keyboard": kb_rows})));
@@ -992,17 +978,14 @@ impl App {
                 ])
             )
         };
-        let mut kb_rows = vec![
-            json!([
-                button("📥 Pending CPA", "cmd:ops_postsmoke", "primary"),
-                button("➡ Post-Generate", "pb:post_generate", "success"),
-            ]),
-            json!([
-                button("🔎 Probe Last Import", "probe:last", "primary"),
-                button("❓ Import Guide", "nav:import_help", ""),
-            ]),
-        ];
-        kb_rows.extend(Self::kb_nav_footer(vec![]));
+        let pills = tg_button_row(&[
+            tg_cb_button_styled("📥 Pending CPA", "cmd:ops_postsmoke", "primary"),
+            tg_cb_button_styled("➡ Post-Generate", "pb:post_generate", "success"),
+            tg_cb_button_styled("🔎 Probe Last", "probe:last", "primary"),
+            tg_cb_button_styled("❓ Guide", "nav:import_help", "link"),
+        ]);
+        let md = format!("{md}\n\n{pills}");
+        let kb_rows = Self::kb_nav_footer(vec![]);
         self.tg
             .present(msg_id, &md, Some(json!({"inline_keyboard": kb_rows})));
     }
@@ -1014,17 +997,18 @@ impl App {
             st.session.awaiting = None;
             self.persist(&st);
         }
-        let mut kb_rows = vec![json!([
-            button("📊 Proxy Status", "cmd:proxy", "primary"),
-            button("🔄 Sync Pool", "cmd:proxy_sync", "success"),
-        ])];
-        kb_rows.extend(Self::kb_nav_footer(vec![]));
+        let pills = tg_button_row(&[
+            tg_cb_button_styled("📊 Proxy Status", "cmd:proxy", "primary"),
+            tg_cb_button_styled("🔄 Sync Pool", "cmd:proxy_sync", "success"),
+        ]);
+        let kb_rows = Self::kb_nav_footer(vec![]);
         let md = format!(
-            "**🌐 Proxy Pool**\n\n{}\n\nCheck winners pool health or trigger a fresh sync.",
+            "**🌐 Proxy Pool**\n\n{}\n\n{}",
             field_grid(&[
                 ("Status", "Ready, cooldown, quarantine, leased & top winners".into()),
                 ("Sync", "Refresh proxy pool state via `af proxy sync`".into()),
-            ])
+            ]),
+            pills,
         );
         self.tg
             .present(msg_id, &md, Some(json!({"inline_keyboard": kb_rows})));
@@ -1134,8 +1118,23 @@ impl App {
             self.persist(&st);
             st.settings.clone()
         };
+        let row1 = tg_button_row(&[
+            tg_cb_button_styled(&format!("Notify: {}", s.notify_mode), "set:notify", "primary"),
+            tg_cb_button_styled(&format!("Provider: {}", s.default_provider), "set:provider", "primary"),
+            tg_cb_button_styled(&format!("Workers: {}", s.default_workers), "set:workers", "primary"),
+        ]);
+        let row2 = tg_button_row(&[
+            tg_cb_button_styled(&format!("Batch: {}", s.default_target_batch), "set:batch", "primary"),
+            tg_cb_button_styled(&format!("Smoke: {}", s.default_target_smoke), "set:smoke", "primary"),
+            tg_cb_button_styled(&format!("Proxy: {}", s.default_proxy_policy), "set:proxy", ""),
+            tg_cb_button_styled(
+                &format!("Auto-Import: {}", if s.auto_import_default { "ON" } else { "OFF" }),
+                "set:autoimport",
+                if s.auto_import_default { "success" } else { "" },
+            ),
+        ]);
         let md = format!(
-            "**⚙️ PX-Abuse Settings**\n\n{}\n\n_Slash `/smoke run` uses the defaults above._",
+            "**⚙️ PX-Abuse Settings**\n\n{}\n\n{}\n\n{}\n\n_Slash `/smoke run` uses the defaults above._",
             field_grid(&[
                 ("Notify Mode", format!("{} (simple / full)", hl(&s.notify_mode))),
                 ("Default Provider", hl(&s.default_provider)),
@@ -1148,28 +1147,11 @@ impl App {
                     "Auto-Import",
                     format!("{} · UI only", if s.auto_import_default { "ON" } else { "OFF" })
                 ),
-            ])
+            ]),
+            row1,
+            row2,
         );
-        let mut kb_rows = vec![
-            json!([
-                button(&format!("Notify: {}", s.notify_mode), "set:notify", ""),
-                button(&format!("Provider: {}", s.default_provider), "set:provider", ""),
-            ]),
-            json!([
-                button(&format!("Workers: {}", s.default_workers), "set:workers", ""),
-                button(&format!("Batch: {}", s.default_target_batch), "set:batch", ""),
-            ]),
-            json!([
-                button(&format!("Smoke: {}", s.default_target_smoke), "set:smoke", ""),
-                button(&format!("Proxy: {}", s.default_proxy_policy), "set:proxy", ""),
-            ]),
-            json!([button(
-                &format!("Auto-Import: {}", if s.auto_import_default { "ON" } else { "OFF" }),
-                "set:autoimport",
-                ""
-            )]),
-        ];
-        kb_rows.extend(Self::kb_nav_footer(vec![]));
+        let kb_rows = Self::kb_nav_footer(vec![]);
         self.tg
             .present(msg_id, &md, Some(json!({"inline_keyboard": kb_rows})));
     }
