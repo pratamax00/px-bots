@@ -2,6 +2,16 @@
 
 All notable changes to **PX Bots** are documented in this file following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-11-21
+
+### Added
+- **`px-mail`** crate (Phase 3):
+  - Full Rust rewrite of the TempMail Telegram bot on `tg-core` (100% English, Telegram-only, Bot API 10.3+ rich UI, in-place editing).
+  - Full Cloudflare Worker API parity (`/admin/new_address`, `/admin/inbox`, `/admin/mailboxes/probe`, `/admin/claim`, `/messages`, `/messages/:id`), FNV-1a 64-bit `mailbox_ref` parity for Worker push notifications (`inbox:msg:<ref>`), and seamless compatibility with existing `mailboxes.json`.
+  - Features: 3-step `/create` (24h / Permanent, custom or random local-part, multi-domain), `/generate` bulk batch up to 10 with one-tap `Copy All`, `/emails` & `/inbox` with retention filters & pagination, automatic OTP extraction with `Copy OTP` pills, and clickable URL action pills inside message cards.
+  - Added crate documentation in `docs/bots/px-mail.md` and registered `px-mail` in `.github/workflows/release.yml`.
+- Registered `/start` as the first slash command in `setMyCommands` across **all** bots (`px-media`, `px-monitor`, `px-notes`, `px-mail`).
+
 ## [0.2.0] - 2026-11-21
 
 ### Added

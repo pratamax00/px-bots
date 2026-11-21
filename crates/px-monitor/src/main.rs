@@ -1205,6 +1205,7 @@ fn main() {
     ));
 
     app.tg.set_my_commands(&[
+        ("start", "Open dashboard"),
         ("menu", "Live monitor dashboard"),
         ("status", "InferHub account & balance"),
         ("usage", "30-day usage summary"),

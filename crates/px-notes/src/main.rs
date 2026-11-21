@@ -938,6 +938,7 @@ fn main() {
     ));
 
     app.tg.set_my_commands(&[
+        ("start", "Open dashboard"),
         ("menu", "Vault dashboard"),
         ("notes", "Browse Markdown notes"),
         ("links", "Browse saved bookmarks"),

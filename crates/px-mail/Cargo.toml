@@ -1,0 +1,13 @@
+[package]
+name = "px-mail"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "PX-Mail — lightweight Telegram TempMail operator with Cloudflare D1 sync, OTP extraction, and Bot API 10.3+ UI"
+
+[dependencies]
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tg-core = { path = "../tg-core" }
+ureq.workspace = true

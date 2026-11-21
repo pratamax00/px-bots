@@ -1394,6 +1394,7 @@ fn main() {
     let app = App::new(cfg);
     log_info(&format!("PX-Media v{VERSION} (Rust) started"));
     app.tg.set_my_commands(&[
+        ("start", "Open dashboard"),
         ("menu", "Dashboard & target folder"),
         ("recent", "Recent files in active folder"),
         ("links", "Media service access links"),
