@@ -16,7 +16,7 @@ use tg_core::bot::TgClient;
 use tg_core::state::{load_json, save_json_atomic};
 use tg_core::ui::{
     button, details_block, field_grid, format_duration, hl, human_bytes, progress_bar, stamp_wib,
-    table_markdown, tail_str, tg_button_row, tg_cb_button_styled, tg_copy_button, tg_url_button,
+    table_markdown, tail_str, tg_button_row, tg_cb_button, tg_cb_button_styled, tg_copy_button, tg_url_button,
     truncate_str,
 };
 use tg_core::{log_error, log_info, log_warn};
