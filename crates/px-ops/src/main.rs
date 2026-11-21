@@ -22,7 +22,7 @@ use tg_core::bot::TgClient;
 use tg_core::state::{load_json, save_json_atomic};
 use tg_core::ui::{
     button, details_block, field_grid, hl, human_bytes, md_text, progress_bar, rows, stamp_wib,
-    table_markdown, tail_str, tg_button_row, tg_cb_button, truncate_str,
+    table_markdown, tail_str, tg_button_row, tg_cb_button_styled, truncate_str,
 };
 use tg_core::{log_error, log_info, log_warn};
 
@@ -331,6 +331,28 @@ impl App {
         })
     }
 
+    /// Slim dashboard keyboard containing only sections not already in the card pills.
+    fn kb_dashboard() -> Value {
+        json!({
+            "inline_keyboard": [
+                [
+                    button("🖥 Server", "menu:server", "primary"),
+                    button("🌐 9Router", "menu:router", "primary"),
+                    button("🧠 Sessions", "menu:sessions", "primary"),
+                ],
+                [
+                    button("🛠 Tools", "menu:tools", "primary"),
+                    button("📋 Jobs", "menu:jobs", "primary"),
+                    button("⚙️ Settings", "menu:settings", "primary"),
+                ],
+                [
+                    button("⚡ Power", "menu:power", "danger"),
+                    button("❓ Help", "menu:help", ""),
+                ],
+            ]
+        })
+    }
+
     fn kb_back_home(extra: Vec<Value>) -> Value {
         let mut all = extra;
         all.push(button("🏠 Home", "menu:dashboard", "primary"));
@@ -447,7 +469,7 @@ impl App {
             .take(14)
             .map(|s| {
                 vec![
-                    s.def.label.clone(),
+                    tg_cb_button_styled(&s.def.label, &format!("svc:open:{}", s.def.id), "link"),
                     s.status_badge(),
                     fmt_mem_opt(s.mem_bytes),
                     s.uptime_secs
@@ -463,9 +485,10 @@ impl App {
         };
 
         let pills = tg_button_row(&[
-            tg_cb_button("🔄 Refresh", "menu:dashboard"),
-            tg_cb_button("⚡ Apps", "menu:apps"),
-            tg_cb_button("🧩 Services", "menu:services"),
+            tg_cb_button_styled("🔄 Refresh", "menu:dashboard", "primary"),
+            tg_cb_button_styled("⚡ Apps", "menu:apps", "success"),
+            tg_cb_button_styled("🧩 Services", "menu:services", "primary"),
+            tg_cb_button_styled("💾 Backup", "menu:backup", "success"),
         ]);
 
         let md = format!(
@@ -480,7 +503,7 @@ impl App {
             ),
             stamp_wib()
         );
-        self.deliver(surf, msg_id, "dashboard", &md, Self::kb_main());
+        self.deliver(surf, msg_id, "dashboard", &md, Self::kb_dashboard());
     }
 
     // ── Apps Toggle Panel ───────────────────────────────────────────────────
@@ -492,40 +515,39 @@ impl App {
         let trows: Vec<Vec<String>> = apps
             .iter()
             .map(|s| {
+                let on = s.tone() == "ok";
+                let act = tg_cb_button_styled(
+                    if on { "⏹ Stop" } else { "▶ Start" },
+                    &format!("app:toggle:{}", s.def.id),
+                    if on { "danger" } else { "success" },
+                );
                 vec![
                     s.def.label.clone(),
                     s.status_badge(),
                     fmt_mem_opt(s.mem_bytes),
-                    s.def.desc.clone().unwrap_or_else(|| "—".to_string()),
+                    act,
                 ]
             })
             .collect();
         let tbl = if trows.is_empty() {
             "_No optional apps configured (`group: \"apps\"`)._".to_string()
         } else {
-            table_markdown(&["App", "State", "RAM", "Role"], &trows)
+            table_markdown(&["App", "State", "RAM", "Action"], &trows)
         };
 
-        let mut btns: Vec<Value> = apps
-            .iter()
-            .map(|s| {
-                let on = s.tone() == "ok";
-                button(
-                    &format!("{} {}", if on { "🟢 Stop" } else { "▶ Start" }, s.def.label),
-                    &format!("app:toggle:{}", s.def.id),
-                    if on { "success" } else { "" },
-                )
-            })
-            .collect();
-        btns.push(button("🔄 Refresh", "menu:apps", "primary"));
-        btns.push(button("🏠 Home", "menu:dashboard", "primary"));
+        let kb = json!({
+            "inline_keyboard": [[
+                button("🔄 Refresh", "menu:apps", "primary"),
+                button("🏠 Home", "menu:dashboard", "primary"),
+            ]]
+        });
 
         let md = format!(
-            "**⚡ Optional Heavy Apps (RAM Saver)**\n\n{}\n\nTap any app below to toggle ON/OFF immediately.\n_Updated: {}_",
+            "**⚡ Optional Heavy Apps (RAM Saver)**\n\n{}\n\nTap Start/Stop in the table to toggle immediately.\n_Updated: {}_",
             tbl,
             stamp_wib()
         );
-        self.deliver(surf, msg_id, "apps", &md, json!({"inline_keyboard": rows(btns)}));
+        self.deliver(surf, msg_id, "apps", &md, kb);
     }
 
     fn exec_app_toggle(&self, surf: Surface, msg_id: Option<i64>, id: &str) {
@@ -573,7 +595,7 @@ impl App {
             .iter()
             .map(|s| {
                 vec![
-                    s.def.label.clone(),
+                    tg_cb_button_styled(&s.def.label, &format!("svc:open:{}", s.def.id), "link"),
                     s.status_badge(),
                     fmt_mem_opt(s.mem_bytes),
                     s.uptime_secs
@@ -583,11 +605,7 @@ impl App {
             })
             .collect();
 
-        let svc_btns: Vec<Value> = slice
-            .iter()
-            .map(|s| button(&s.def.label, &format!("svc:open:{}", s.def.id), s.btn_style()))
-            .collect();
-        let mut kb_rows = rows(svc_btns).as_array().cloned().unwrap_or_default();
+        let mut kb_rows: Vec<Value> = Vec::new();
         let mut pager = Vec::new();
         if page > 0 {
             pager.push(button("◀ Prev", &format!("menu:services:{}", page - 1), "primary"));
@@ -629,8 +647,18 @@ impl App {
             .next()
             .unwrap();
         let is_manual_off = self.state.lock().unwrap().manual_off.contains(&svc.id);
+        let is_active = snap.tone() == "ok";
+        let mut action_pills = Vec::new();
+        if is_active {
+            action_pills.push(tg_cb_button_styled("🔁 Restart", &format!("svc:restart:{}", svc.id), "primary"));
+            action_pills.push(tg_cb_button_styled("⏹ Stop", &format!("svc:stop:{}", svc.id), "danger"));
+        } else {
+            action_pills.push(tg_cb_button_styled("▶ Start", &format!("svc:start:{}", svc.id), "success"));
+        }
+        action_pills.push(tg_cb_button_styled("📜 Logs", &format!("svc:logs:{}", svc.id), "link"));
+
         let md = format!(
-            "**🧩 Service · {}**\n\n{}\n\n_Updated: {}_",
+            "**🧩 Service · {}**\n\n{}\n\n{}\n\n_Updated: {}_",
             md_text(&svc.label),
             field_grid(&[
                 ("ID", format!("`{}`", svc.id)),
@@ -655,24 +683,15 @@ impl App {
                     }
                 ),
             ]),
+            tg_button_row(&action_pills),
             stamp_wib()
         );
         let kb = json!({
-            "inline_keyboard": [
-                [
-                    button("🔄 Refresh", &format!("svc:open:{}", svc.id), "primary"),
-                    button("📜 Logs", &format!("svc:logs:{}", svc.id), "primary"),
-                ],
-                [
-                    button("▶ Start", &format!("svc:start:{}", svc.id), "success"),
-                    button("🔁 Restart", &format!("svc:restart:{}", svc.id), "primary"),
-                ],
-                [
-                    button("⏹ Stop", &format!("svc:stop:{}", svc.id), "danger"),
-                    button("↩ Services", "menu:services", "primary"),
-                ],
-                [button("🏠 Home", "menu:dashboard", "primary")],
-            ]
+            "inline_keyboard": [[
+                button("🔄 Refresh", &format!("svc:open:{}", svc.id), "primary"),
+                button("↩ Services", "menu:services", "primary"),
+                button("🏠 Home", "menu:dashboard", "primary"),
+            ]]
         });
         self.deliver(surf, msg_id, &format!("svc-{}", svc.id), &md, kb);
     }
@@ -1494,32 +1513,32 @@ impl App {
             .iter()
             .map(|e| {
                 vec![
-                    e.label.clone(),
+                    tg_cb_button_styled(&e.label, &format!("bak:open:{}", e.target), "link"),
                     if e.file.is_some() { human_bytes(e.bytes) } else { "—".into() },
                     truncate_str(&e.created_at, 16),
                 ]
             })
             .collect();
 
-        let mut btns: Vec<Value> = targets
-            .iter()
-            .take(10)
-            .map(|t| button(&format!("💾 {}", t.label), &format!("bak:open:{}", t.id), ""))
-            .collect();
-        btns.push(button("📦 Backup All", "bak:all", "success"));
-        btns.push(button("🔄 Refresh", "menu:backup", "primary"));
-        btns.push(button("🏠 Home", "menu:dashboard", "primary"));
+        let pills = tg_button_row(&[tg_cb_button_styled("📦 Backup All", "bak:all", "success")]);
+        let kb = json!({
+            "inline_keyboard": [[
+                button("🔄 Refresh", "menu:backup", "primary"),
+                button("🏠 Home", "menu:dashboard", "primary"),
+            ]]
+        });
 
         let md = format!(
-            "**💾 Backup Manager**\n\n{}\n\nTap a target to create, verify, or restore its latest archive.\n_Updated: {}_",
+            "**💾 Backup Manager**\n\n{}\n\n{}\n\nTap a target in the table to create, verify, or restore.\n_Updated: {}_",
             if trows.is_empty() {
                 "_No backup targets configured._".to_string()
             } else {
                 table_markdown(&["Target", "Size", "Latest"], &trows)
             },
+            pills,
             stamp_wib()
         );
-        self.deliver(surf, msg_id, "backup", &md, json!({"inline_keyboard": rows(btns)}));
+        self.deliver(surf, msg_id, "backup", &md, kb);
     }
 
     fn render_backup_target(&self, surf: Surface, msg_id: Option<i64>, target_id: &str) {
@@ -1535,8 +1554,25 @@ impl App {
             .into_iter()
             .next();
         let file_opt = latest.as_ref().and_then(|e| e.file.clone());
+        let mut action_pills = vec![tg_cb_button_styled(
+            "➕ Create Backup",
+            &format!("bak:create:{}", t.id),
+            "success",
+        )];
+        if file_opt.is_some() {
+            action_pills.push(tg_cb_button_styled(
+                "✅ Verify SHA-256",
+                &format!("bak:verify:{}", t.id),
+                "primary",
+            ));
+            action_pills.push(tg_cb_button_styled(
+                "♻️ Restore",
+                &format!("bak:restore:{}", t.id),
+                "danger",
+            ));
+        }
         let md = format!(
-            "**💾 Backup Target · {}**\n\n{}",
+            "**💾 Backup Target · {}**\n\n{}\n\n{}",
             md_text(&t.label),
             field_grid(&[
                 ("ID", format!("`{}`", t.id)),
@@ -1557,24 +1593,16 @@ impl App {
                         .map(|e| human_bytes(e.bytes))
                         .unwrap_or_else(|| "—".into())
                 ),
-            ])
+            ]),
+            tg_button_row(&action_pills),
         );
-        let mut kb_rows = vec![json!([button(
-            "➕ Create Backup Now",
-            &format!("bak:create:{}", t.id),
-            "success"
-        )])];
-        if file_opt.is_some() {
-            kb_rows.push(json!([
-                button("✅ Verify SHA-256", &format!("bak:verify:{}", t.id), "primary"),
-                button("♻️ Restore Latest", &format!("bak:restore:{}", t.id), "danger"),
-            ]));
-        }
-        kb_rows.push(json!([
-            button("↩ Backup", "menu:backup", "primary"),
-            button("🏠 Home", "menu:dashboard", "primary"),
-        ]));
-        self.deliver(surf, msg_id, &format!("bak-{}", t.id), &md, json!({"inline_keyboard": kb_rows}));
+        let kb = json!({
+            "inline_keyboard": [[
+                button("↩ Backup", "menu:backup", "primary"),
+                button("🏠 Home", "menu:dashboard", "primary"),
+            ]]
+        });
+        self.deliver(surf, msg_id, &format!("bak-{}", t.id), &md, kb);
     }
 
     // ── Jobs, Power, Settings, Help ─────────────────────────────────────────
@@ -1585,26 +1613,20 @@ impl App {
             .take(10)
             .map(|j| {
                 vec![
-                    format!("{} `{}`", job_icon(&j.status), j.id),
+                    tg_cb_button_styled(
+                        &format!("{} {}", job_icon(&j.status), j.id),
+                        &format!("job:open:{}", j.id),
+                        "link",
+                    ),
                     j.status.clone(),
                     truncate_str(&j.label, 28),
                 ]
             })
             .collect();
-        let jbtns: Vec<Value> = list
-            .iter()
-            .take(6)
-            .map(|j| button(&format!("{} {}", job_icon(&j.status), j.id), &format!("job:open:{}", j.id), ""))
-            .collect();
-        let mut kb_rows = if jbtns.is_empty() {
-            Vec::new()
-        } else {
-            rows(jbtns).as_array().cloned().unwrap_or_default()
-        };
-        kb_rows.push(json!([
+        let kb_rows = vec![json!([
             button("🔄 Refresh", "menu:jobs", "primary"),
             button("🏠 Home", "menu:dashboard", "primary"),
-        ]));
+        ])];
         let md = format!(
             "**📋 Background Jobs**\n\n{}\n\n{}\n\nUse `/job <id>` or `/stop <id>`.\n_Updated: {}_",
             field_grid(&[
@@ -1634,34 +1656,37 @@ impl App {
         };
         let log = self.jobs.read_log(&job);
         let running = job.status == "running";
+        let stop_pill = if running {
+            format!(
+                "\n\n{}",
+                tg_button_row(&[tg_cb_button_styled("🛑 Stop Job", &format!("job:stop:{}", job.id), "danger")])
+            )
+        } else {
+            String::new()
+        };
         let md = format!(
-            "**📄 Job `{}`**\n\n{}\n\n{}\n\n_Updated: {}_",
+            "**📄 Job `{}`**\n\n{}{}\n\n{}\n\n_Updated: {}_",
             job.id,
             field_grid(&[
                 ("Status", hl(&format!("{} {}", job_icon(&job.status), job.status))),
                 ("Label", md_text(&job.label)),
                 ("Exit", job.exit_code.map(|c| c.to_string()).unwrap_or_else(|| "—".into())),
             ]),
+            stop_pill,
             details_block(
                 "Log Tail",
                 &format!("```\n{}\n```", tail_str(&log, 2200).replace("```", "'''"))
             ),
             stamp_wib()
         );
-        let mut kb_rows = Vec::new();
-        if running {
-            kb_rows.push(json!([
+        let kb = json!({
+            "inline_keyboard": [[
                 button("🔄 Refresh", &format!("job:open:{}", job.id), "primary"),
-                button("🛑 Stop", &format!("job:stop:{}", job.id), "danger"),
-            ]));
-        } else {
-            kb_rows.push(json!([button("🔄 Refresh", &format!("job:open:{}", job.id), "primary")]));
-        }
-        kb_rows.push(json!([
-            button("📋 Jobs", "menu:jobs", "primary"),
-            button("🏠 Home", "menu:dashboard", "primary"),
-        ]));
-        self.deliver(surf, msg_id, &format!("job-{}", job.id), &md, json!({"inline_keyboard": kb_rows}));
+                button("📋 Jobs", "menu:jobs", "primary"),
+                button("🏠 Home", "menu:dashboard", "primary"),
+            ]]
+        });
+        self.deliver(surf, msg_id, &format!("job-{}", job.id), &md, kb);
     }
 
     fn render_power(&self, surf: Surface, msg_id: Option<i64>) {

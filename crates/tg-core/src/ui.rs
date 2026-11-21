@@ -92,8 +92,19 @@ pub fn tg_url_button(label: &str, url: &str) -> String {
 
 /// Native in-bubble callback pill button (`<tg-button type="callback_data">`).
 pub fn tg_cb_button(label: &str, data: &str) -> String {
+    tg_cb_button_styled(label, data, "")
+}
+
+/// Native in-bubble callback pill button with optional Bot API 10.3+ style
+/// (`primary`, `success`, `danger`, `link`, or `""`).
+pub fn tg_cb_button_styled(label: &str, data: &str, style: &str) -> String {
+    let attr = if matches!(style, "primary" | "success" | "danger" | "link") {
+        format!(" style=\"{style}\"")
+    } else {
+        String::new()
+    };
     format!(
-        "<tg-button type=\"callback_data\" data=\"{}\">{label}</tg-button>",
+        "<tg-button type=\"callback_data\" data=\"{}\"{attr}>{label}</tg-button>",
         esc_attr(data)
     )
 }
@@ -285,6 +296,14 @@ mod tests {
         assert_eq!(
             tg_copy_button("Copy", "/data/media"),
             "<tg-button type=\"copy_text\" text=\"/data/media\">Copy</tg-button>"
+        );
+        assert_eq!(
+            tg_cb_button_styled("Start", "app:toggle:immich", "success"),
+            "<tg-button type=\"callback_data\" data=\"app:toggle:immich\" style=\"success\">Start</tg-button>"
+        );
+        assert_eq!(
+            tg_cb_button_styled("Open", "svc:open:nginx", "link"),
+            "<tg-button type=\"callback_data\" data=\"svc:open:nginx\" style=\"link\">Open</tg-button>"
         );
         assert_eq!(
             markdown_to_html("**Title** ==OK== `x`"),
