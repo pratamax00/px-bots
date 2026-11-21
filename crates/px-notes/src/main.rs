@@ -659,7 +659,7 @@ fn is_valid_tg_url(raw: &str) -> bool {
         return false;
     };
     if rest.is_empty()
-        || u.chars().any(|c| c.is_whitespace() || matches!(c, '`' | '"' | ''' | '<' | '>' | '(' | ')'))
+        || u.chars().any(|c| c.is_whitespace() || "`\"'<>()".contains(c))
     {
         return false;
     }
