@@ -1,0 +1,17 @@
+{
+  "primary_group_id": "-1001234567890",
+  "legacy_marker": "",
+  "owner_dm_label": "DM Owner",
+  "forum_labels": {
+    "1": "Forum General",
+    "5": "Forum Ops"
+  },
+  "group_topic_labels": {
+    "-1009876543210": {
+      "1": "Project \u00b7 General"
+    }
+  },
+  "group_prefix": {
+    "-1009876543210": "Project"
+  }
+}

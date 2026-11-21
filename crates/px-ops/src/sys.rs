@@ -1201,10 +1201,35 @@ pub struct SessionItem {
     pub compress_pct: Option<f64>,
 }
 
-pub fn load_agent_sessions(profile_dir: &Path) -> Vec<SessionItem> {
+#[derive(Debug, Clone, Default, Deserialize)]
+struct SessionLabelsConfig {
+    #[serde(default)]
+    primary_group_id: String,
+    #[serde(default)]
+    legacy_marker: String,
+    #[serde(default)]
+    owner_dm_label: String,
+    #[serde(default)]
+    forum_labels: HashMap<String, String>,
+    #[serde(default)]
+    group_topic_labels: HashMap<String, HashMap<String, String>>,
+    #[serde(default)]
+    group_prefix: HashMap<String, String>,
+}
+
+fn load_session_labels(config_dir: &Path) -> SessionLabelsConfig {
+    let p = config_dir.join("session-labels.json");
+    fs::read_to_string(p)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+pub fn load_agent_sessions(profile_dir: &Path, config_dir: &Path) -> Vec<SessionItem> {
     let sessions_val: Value = load_json(&profile_dir.join("sessions").join("sessions.json"));
     let modes_val: Value = load_json(&profile_dir.join("state").join("session_modes.json"));
     let comp_val: Value = load_json(&profile_dir.join("state").join("session_compress.json"));
+    let labels = load_session_labels(config_dir);
 
     let fp: HashSet<String> = modes_val
         .get("fullpower")
@@ -1218,21 +1243,25 @@ pub fn load_agent_sessions(profile_dir: &Path) -> Vec<SessionItem> {
         .unwrap_or_default();
 
     let mut keys: Vec<String> = Vec::new();
+    let is_valid_key = |k: &str| {
+        k.starts_with("agent:main:telegram:")
+            && (labels.legacy_marker.is_empty() || !k.contains(&labels.legacy_marker))
+    };
     if let Some(map) = sessions_val.as_object() {
         for k in map.keys() {
-            if k.starts_with("agent:main:telegram:") {
+            if is_valid_key(k) {
                 keys.push(k.clone());
             }
         }
     }
     for k in fp.iter().chain(he.iter()) {
-        if k.starts_with("agent:main:telegram:") && !keys.contains(k) {
+        if is_valid_key(k) && !keys.contains(k) {
             keys.push(k.clone());
         }
     }
-    keys.sort();
 
-    keys.into_iter()
+    let mut items: Vec<SessionItem> = keys
+        .into_iter()
         .map(|k| {
             let mode = if fp.contains(&k) {
                 "fullpower".to_string()
@@ -1249,7 +1278,8 @@ pub fn load_agent_sessions(profile_dir: &Path) -> Vec<SessionItem> {
             let compress_pct = comp_val
                 .pointer(&format!("/overrides/{}", k.replace('/', "~1")))
                 .and_then(Value::as_f64);
-            let label = short_session_label(&k);
+            let chat_name = entry.and_then(|e| e.pointer("/origin/chat_name").and_then(Value::as_str));
+            let label = resolve_session_label(&k, chat_name, &labels);
             SessionItem {
                 key: k,
                 label,
@@ -1258,18 +1288,67 @@ pub fn load_agent_sessions(profile_dir: &Path) -> Vec<SessionItem> {
                 compress_pct,
             }
         })
-        .collect()
+        .collect();
+    items.sort_by(|a, b| a.label.to_lowercase().cmp(&b.label.to_lowercase()));
+    items
 }
 
-fn short_session_label(key: &str) -> String {
+fn resolve_session_label(key: &str, chat_name: Option<&str>, cfg: &SessionLabelsConfig) -> String {
     let trimmed = key.trim_start_matches("agent:main:telegram:");
     if trimmed.starts_with("dm:") {
-        "DM Owner".to_string()
-    } else if let Some((_, thr)) = trimmed.rsplit_once(":thread:") {
-        format!("Topic #{thr}")
-    } else {
-        truncate_str(trimmed, 24)
+        if !cfg.owner_dm_label.is_empty() {
+            return cfg.owner_dm_label.clone();
+        }
+        return chat_name.map(|s| format!("DM · {s}")).unwrap_or_else(|| "DM Owner".to_string());
     }
+    if let Some(rest) = trimmed.strip_prefix("group:") {
+        let parts: Vec<&str> = rest.split(':').collect();
+        let chat_id = parts.first().copied().unwrap_or("");
+        let thread_id = if parts.len() >= 3 && parts[1] == "thread" {
+            Some(parts[2])
+        } else if parts.len() >= 2 {
+            Some(parts[1])
+        } else {
+            None
+        };
+        if let Some(thr) = thread_id {
+            if !cfg.primary_group_id.is_empty() && chat_id == cfg.primary_group_id {
+                if let Some(lbl) = cfg.forum_labels.get(thr) {
+                    return lbl.clone();
+                }
+            }
+            if let Some(map) = cfg.group_topic_labels.get(chat_id) {
+                if let Some(lbl) = map.get(thr) {
+                    return lbl.clone();
+                }
+            }
+            if let Some(pref) = cfg.group_prefix.get(chat_id) {
+                return format!("{pref} · #{thr}");
+            }
+            if let Some(cn) = chat_name {
+                return format!("{cn} · #{thr}");
+            }
+            return format!("Topic #{thr}");
+        }
+        if let Some(pref) = cfg.group_prefix.get(chat_id) {
+            return pref.clone();
+        }
+        if let Some(cn) = chat_name {
+            return cn.to_string();
+        }
+    }
+    truncate_str(trimmed, 24)
+}
+
+pub fn trigger_compress_now(profile_dir: &Path, keys: &[String]) {
+    let path = profile_dir.join("state").join("compress-now.json");
+    save_json_atomic(
+        &path,
+        &json!({
+            "sessions": keys,
+            "ts": now_epoch() * 1000,
+        }),
+    );
 }
 
 pub fn set_agent_session_mode(profile_dir: &Path, key: &str, mode: &str) -> Result<(), String> {

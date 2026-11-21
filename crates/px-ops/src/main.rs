@@ -16,7 +16,7 @@ use sys::{
     load_ops_forum, load_services, load_thresholds, now_epoch, read_host_metrics, restore_backup,
     router_get, router_refresh_catalog, run_argv, run_shell, service_control, service_logs,
     set_agent_session_compress, set_agent_session_mode, set_agent_session_model, svec,
-    utc_compact_stamp, verify_backup, JobManager, ServiceSnap,
+    trigger_compress_now, utc_compact_stamp, verify_backup, JobManager, ServiceSnap,
 };
 use tg_core::bot::TgClient;
 use tg_core::state::{load_json, save_json_atomic};
@@ -29,6 +29,7 @@ use tg_core::{log_error, log_info, log_warn};
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const CONFIRM_TTL_SECS: u64 = 180;
 const SERVICES_PAGE_SIZE: usize = 8;
+const SESSIONS_PAGE_SIZE: usize = 10;
 
 // ── configuration (100% env-only) ───────────────────────────────────────────
 #[derive(Clone)]
@@ -160,6 +161,9 @@ enum ConfirmAction {
     BackupAll,
     BackupRestore { target_id: String, file_name: String },
     SessionsBulkMode { mode: String },
+    SessionsBulkModel { model: Option<String> },
+    SessionsBulkCompress { pct: Option<u32> },
+    SessionsCompressNow,
 }
 
 #[derive(Debug, Clone)]
@@ -1163,7 +1167,7 @@ impl App {
     }
 
     // ── Sessions Panel ──────────────────────────────────────────────────────
-    fn render_sessions(&self, surf: Surface, msg_id: Option<i64>) {
+    fn render_sessions(&self, surf: Surface, msg_id: Option<i64>, page: usize) {
         let Some(ref pdir) = self.cfg.hermes_profile_dir else {
             self.deliver(
                 surf,
@@ -1174,53 +1178,164 @@ impl App {
             );
             return;
         };
-        let list = load_agent_sessions(pdir);
+        let list = load_agent_sessions(pdir, &self.cfg.config_dir);
         {
             let mut st = self.state.lock().unwrap();
             st.session_keys = list.iter().map(|s| s.key.clone()).collect();
             self.persist(&st);
         }
+        let total = list.len();
+        let total_pages = total.div_ceil(SESSIONS_PAGE_SIZE).max(1);
+        let p = page.min(total_pages - 1);
+        let start = p * SESSIONS_PAGE_SIZE;
+        let end = (start + SESSIONS_PAGE_SIZE).min(total);
+
         let fp = list.iter().filter(|s| s.mode == "fullpower").count();
         let he = list.iter().filter(|s| s.mode == "hemat").count();
-        let trows: Vec<Vec<String>> = list
-            .iter()
-            .take(14)
-            .enumerate()
-            .map(|(idx, s)| {
+        let ov_mod = list.iter().filter(|s| s.model != "default").count();
+        let ov_comp = list.iter().filter(|s| s.compress_pct.is_some()).count();
+
+        let trows: Vec<Vec<String>> = (start..end)
+            .map(|idx| {
+                let s = &list[idx];
+                let comp = s
+                    .compress_pct
+                    .map(|v| format!("{}%", (v * 100.0).round() as i32))
+                    .unwrap_or_else(|| "auto".to_string());
                 vec![
-                    tg_cb_button_styled(&s.label, &format!("ses:open:{idx}"), "link"),
+                    tg_cb_button_styled(&truncate_str(&s.label, 24), &format!("ses:open:{idx}"), "link"),
                     s.mode.clone(),
-                    truncate_str(&s.model, 22),
+                    truncate_str(&s.model, 18),
+                    comp,
                 ]
             })
             .collect();
-        let bulk_pills = tg_button_row(&[
-            tg_cb_button_styled("⚡ Bulk Santai", "ses:bulk:santai", "primary"),
-            tg_cb_button_styled("🌿 Bulk Hemat", "ses:bulk:hemat", "success"),
-            tg_cb_button_styled("🔥 Bulk Fullpower", "ses:bulk:fullpower", "danger"),
+
+        let bulk_row1 = tg_button_row(&[
+            tg_cb_button_styled("⚡ Bulk Mode", "ses:bmode", "primary"),
+            tg_cb_button_styled("🤖 Bulk Model", "ses:bmodel", "primary"),
+            tg_cb_button_styled("🗜 Bulk Compress", "ses:bcomp", "primary"),
         ]);
-        let kb = json!({
-            "inline_keyboard": [[
-                button("🔄 Refresh", "menu:sessions", "primary"),
-                button("🏠 Home", "menu:dashboard", "primary"),
-            ]]
-        });
+        let bulk_row2 = tg_button_row(&[
+            tg_cb_button_styled("🔥 Compress Now", "ses:compnow", "danger"),
+        ]);
+
+        let mut kb_rows: Vec<Value> = Vec::new();
+        let mut pager = Vec::new();
+        if p > 0 {
+            pager.push(button("◀ Prev", &format!("ses:page:{}", p - 1), "primary"));
+        }
+        if p + 1 < total_pages {
+            pager.push(button("Next ▶", &format!("ses:page:{}", p + 1), "primary"));
+        }
+        if !pager.is_empty() {
+            kb_rows.push(Value::Array(pager));
+        }
+        kb_rows.push(json!([
+            button("🔄 Refresh", &format!("ses:page:{p}"), "primary"),
+            button("🏠 Home", "menu:dashboard", "primary"),
+        ]));
 
         let md = format!(
-            "**🧠 Agent Sessions**\n\n{}\n\n{}\n\n{}\n\nTap a session in the table to configure mode or model.\n_Updated: {}_",
+            "**🧠 Agent Sessions** · Page {}/{total_pages}\n\n{}\n\n{}\n\n{}\n\n{}\n\nTap any session in the table for individual Mode / Model / Compress.\n_Updated: {}_",
+            p + 1,
             field_grid(&[
-                ("Total Sessions", list.len().to_string()),
+                ("Total Sessions", total.to_string()),
                 ("Fullpower / Hemat", format!("{fp} / {he}")),
+                ("Overrides", format!("{ov_mod} model · {ov_comp} compress")),
             ]),
             if trows.is_empty() {
                 "_No Telegram sessions found._".to_string()
             } else {
-                table_markdown(&["Session", "Mode", "Model"], &trows)
+                table_markdown(&["Session", "Mode", "Model", "Comp"], &trows)
             },
-            bulk_pills,
+            bulk_row1,
+            bulk_row2,
             stamp_wib()
         );
-        self.deliver(surf, msg_id, "sessions", &md, kb);
+        self.deliver(surf, msg_id, "sessions", &md, json!({"inline_keyboard": kb_rows}));
+    }
+
+    fn render_sessions_bulk_mode(&self, surf: Surface, msg_id: Option<i64>) {
+        let pills = tg_button_row(&[
+            tg_cb_button_styled("😌 All Santai", "ses:bulk:santai", "primary"),
+            tg_cb_button_styled("🌿 All Hemat", "ses:bulk:hemat", "success"),
+            tg_cb_button_styled("🔥 All Fullpower", "ses:bulk:fullpower", "danger"),
+        ]);
+        let md = format!(
+            "**⚡ Bulk Session Mode**\n\nApply a mode preset to **all** tracked Telegram sessions.\n\n{pills}"
+        );
+        let kb = json!({
+            "inline_keyboard": [[
+                button("↩ Sessions", "menu:sessions", "primary"),
+                button("🏠 Home", "menu:dashboard", "primary"),
+            ]]
+        });
+        self.deliver(surf, msg_id, "sessions-bulk-mode", &md, kb);
+    }
+
+    fn render_sessions_bulk_model(&self, surf: Surface, msg_id: Option<i64>) {
+        let dd = self.cfg.router_data_dir.as_deref();
+        let models: Vec<String> = match router_get(&self.cfg.router_base_url, &self.cfg.router_api_key, dd, "/v1/models", 10) {
+            Ok(v) => extract_router_list(&v)
+                .into_iter()
+                .filter_map(|m| m.get("id").and_then(Value::as_str).map(ToString::to_string))
+                .take(14)
+                .collect(),
+            Err(_) => Vec::new(),
+        };
+        {
+            let mut st = self.state.lock().unwrap();
+            st.model_choices = models.clone();
+            self.persist(&st);
+        }
+        let list_md = if models.is_empty() {
+            "_No models returned by 9Router `/v1/models`._".to_string()
+        } else {
+            let mrows: Vec<Vec<String>> = models
+                .iter()
+                .enumerate()
+                .map(|(mi, m)| {
+                    vec![
+                        format!("#{}", mi + 1),
+                        tg_cb_button_styled(&truncate_str(m, 34), &format!("ses:bmodelset:{mi}"), "link"),
+                    ]
+                })
+                .collect();
+            table_markdown(&["#", "Model (Apply to All)"], &mrows)
+        };
+        let clear_pill = tg_button_row(&[tg_cb_button_styled(
+            "🧹 Clear Model Override (All)",
+            "ses:bmodelclr",
+            "danger",
+        )]);
+        let md = format!("**🤖 Bulk Model Override**\n\n{list_md}\n\n{clear_pill}");
+        let kb = json!({
+            "inline_keyboard": [[
+                button("↩ Sessions", "menu:sessions", "primary"),
+                button("🏠 Home", "menu:dashboard", "primary"),
+            ]]
+        });
+        self.deliver(surf, msg_id, "sessions-bulk-model", &md, kb);
+    }
+
+    fn render_sessions_bulk_compress(&self, surf: Surface, msg_id: Option<i64>) {
+        let pills = tg_button_row(&[
+            tg_cb_button_styled("🗜 10%", "ses:bcompset:10", "primary"),
+            tg_cb_button_styled("🗜 25%", "ses:bcompset:25", "primary"),
+            tg_cb_button_styled("🗜 50%", "ses:bcompset:50", "primary"),
+            tg_cb_button_styled("🧹 Reset All", "ses:bcompset:0", "danger"),
+        ]);
+        let md = format!(
+            "**🗜 Bulk Session Compression**\n\nSet context compression threshold for **all** tracked Telegram sessions.\n\n{pills}"
+        );
+        let kb = json!({
+            "inline_keyboard": [[
+                button("↩ Sessions", "menu:sessions", "primary"),
+                button("🏠 Home", "menu:dashboard", "primary"),
+            ]]
+        });
+        self.deliver(surf, msg_id, "sessions-bulk-compress", &md, kb);
     }
 
     fn render_session_detail(&self, surf: Surface, msg_id: Option<i64>, idx: usize) {
@@ -1229,12 +1344,12 @@ impl App {
         };
         let key_opt = self.state.lock().unwrap().session_keys.get(idx).cloned();
         let Some(key) = key_opt else {
-            self.render_sessions(surf, msg_id);
+            self.render_sessions(surf, msg_id, 0);
             return;
         };
-        let list = load_agent_sessions(pdir);
+        let list = load_agent_sessions(pdir, &self.cfg.config_dir);
         let Some(item) = list.into_iter().find(|s| s.key == key) else {
-            self.render_sessions(surf, msg_id);
+            self.render_sessions(surf, msg_id, 0);
             return;
         };
         let comp_str = item
@@ -1370,7 +1485,7 @@ impl App {
                     .cfg
                     .hermes_profile_dir
                     .as_deref()
-                    .map(|p| load_agent_sessions(p).len())
+                    .map(|p| load_agent_sessions(p, &self.cfg.config_dir).len())
                     .unwrap_or(0);
                 format!(
                     "**🩺 PX-Ops Self-Check**\n\n{}\n\n_Updated: {}_",
@@ -1955,13 +2070,55 @@ impl App {
             }
             ConfirmAction::SessionsBulkMode { mode } => {
                 if let Some(ref pdir) = self.cfg.hermes_profile_dir {
-                    let list = load_agent_sessions(pdir);
+                    let list = load_agent_sessions(pdir, &self.cfg.config_dir);
                     for s in &list {
                         let _ = set_agent_session_mode(pdir, &s.key, &mode);
                     }
-                    self.jobs.append_audit("sessions.bulk", &mode, 0, 0, &format!("count={}", list.len()));
+                    self.jobs.append_audit("sessions.bulk.mode", &mode, 0, 0, &format!("count={}", list.len()));
                 }
-                self.render_sessions(surf, msg_id);
+                self.render_sessions(surf, msg_id, 0);
+            }
+            ConfirmAction::SessionsBulkModel { model } => {
+                if let Some(ref pdir) = self.cfg.hermes_profile_dir {
+                    let list = load_agent_sessions(pdir, &self.cfg.config_dir);
+                    for s in &list {
+                        set_agent_session_model(pdir, &s.key, model.as_deref(), &self.cfg.router_base_url);
+                    }
+                    self.jobs.append_audit(
+                        "sessions.bulk.model",
+                        model.as_deref().unwrap_or("clear"),
+                        0,
+                        0,
+                        &format!("count={}", list.len()),
+                    );
+                }
+                self.render_sessions(surf, msg_id, 0);
+            }
+            ConfirmAction::SessionsBulkCompress { pct } => {
+                if let Some(ref pdir) = self.cfg.hermes_profile_dir {
+                    let list = load_agent_sessions(pdir, &self.cfg.config_dir);
+                    let val = pct.map(|p| p as f64 / 100.0);
+                    for s in &list {
+                        set_agent_session_compress(pdir, &s.key, val);
+                    }
+                    self.jobs.append_audit(
+                        "sessions.bulk.compress",
+                        &pct.map(|p| format!("{p}%")).unwrap_or_else(|| "reset".into()),
+                        0,
+                        0,
+                        &format!("count={}", list.len()),
+                    );
+                }
+                self.render_sessions(surf, msg_id, 0);
+            }
+            ConfirmAction::SessionsCompressNow => {
+                if let Some(ref pdir) = self.cfg.hermes_profile_dir {
+                    let list = load_agent_sessions(pdir, &self.cfg.config_dir);
+                    let keys: Vec<String> = list.iter().map(|s| s.key.clone()).collect();
+                    trigger_compress_now(pdir, &keys);
+                    self.jobs.append_audit("sessions.compress_now", "all", 0, 0, &format!("count={}", keys.len()));
+                }
+                self.render_sessions(surf, msg_id, 0);
             }
         }
     }
@@ -2150,7 +2307,7 @@ fn handle_callback(app: &Arc<App>, cb: &Value) {
         } else if target == "router" {
             app.render_router_menu(surf, msg_id);
         } else if target == "sessions" {
-            app.render_sessions(surf, msg_id);
+            app.render_sessions(surf, msg_id, 0);
         } else if target == "tools" {
             app.render_tools_menu(surf, msg_id);
         } else if target == "backup" {
@@ -2314,6 +2471,73 @@ fn handle_callback(app: &Arc<App>, cb: &Value) {
                     app.render_session_detail(surf, msg_id, idx);
                 }
             }
+            ["page", p_s] => {
+                let p = p_s.parse::<usize>().unwrap_or(0);
+                app.render_sessions(surf, msg_id, p);
+            }
+            ["bmode"] => app.render_sessions_bulk_mode(surf, msg_id),
+            ["bmodel"] => {
+                let a = Arc::clone(app);
+                thread::spawn(move || a.render_sessions_bulk_model(surf, msg_id));
+            }
+            ["bmodelset", mi_s] => {
+                if let Ok(mi) = mi_s.parse::<usize>() {
+                    let mod_opt = app.state.lock().unwrap().model_choices.get(mi).cloned();
+                    if let Some(m) = mod_opt {
+                        app.ask_confirm(
+                            surf,
+                            msg_id,
+                            "Bulk Session Model Override",
+                            &[("Model", format!("`{}`", md_text(&m))), ("Scope", "All Telegram sessions".into())],
+                            "Apply this model override to every tracked session?",
+                            "✅ Apply Bulk Model",
+                            ConfirmAction::SessionsBulkModel { model: Some(m) },
+                            false,
+                        );
+                    }
+                }
+            }
+            ["bmodelclr"] => {
+                app.ask_confirm(
+                    surf,
+                    msg_id,
+                    "Clear All Model Overrides",
+                    &[("Action", hl("Reset to default")), ("Scope", "All Telegram sessions".into())],
+                    "Remove custom model override from every tracked session?",
+                    "🧹 Clear All Models",
+                    ConfirmAction::SessionsBulkModel { model: None },
+                    true,
+                );
+            }
+            ["bcomp"] => app.render_sessions_bulk_compress(surf, msg_id),
+            ["bcompset", pct_s] => {
+                if let Ok(p) = pct_s.parse::<u32>() {
+                    let opt = if p == 0 { None } else { Some(p) };
+                    let lbl = opt.map(|v| format!("{v}%")).unwrap_or_else(|| "Reset to preset".into());
+                    app.ask_confirm(
+                        surf,
+                        msg_id,
+                        "Bulk Session Compression",
+                        &[("Threshold", hl(&lbl)), ("Scope", "All Telegram sessions".into())],
+                        "Apply this compression threshold to every tracked session?",
+                        "✅ Apply Bulk Compress",
+                        ConfirmAction::SessionsBulkCompress { pct: opt },
+                        opt.is_none(),
+                    );
+                }
+            }
+            ["compnow"] => {
+                app.ask_confirm(
+                    surf,
+                    msg_id,
+                    "Trigger Compress Now",
+                    &[("Action", hl("Write compress-now.json")), ("Scope", "All active Telegram sessions".into())],
+                    "Request immediate context compression for all active sessions?",
+                    "🔥 Compress Now",
+                    ConfirmAction::SessionsCompressNow,
+                    true,
+                );
+            }
             ["bulk", mode] => {
                 app.ask_confirm(
                     surf,
@@ -2326,7 +2550,7 @@ fn handle_callback(app: &Arc<App>, cb: &Value) {
                     false,
                 );
             }
-            _ => app.render_sessions(surf, msg_id),
+            _ => app.render_sessions(surf, msg_id, 0),
         }
         return;
     }
@@ -2550,7 +2774,7 @@ fn handle_message(app: &Arc<App>, msg: &Value) {
         }
         "/server" => app.render_server_menu(surf, None),
         "/router" => app.render_router_menu(surf, None),
-        "/sessions" => app.render_sessions(surf, None),
+        "/sessions" => app.render_sessions(surf, None, 0),
         "/tools" => app.render_tools_menu(surf, None),
         "/backup" => {
             thread::spawn(move || a.render_backup_menu(surf, None));
